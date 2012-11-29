@@ -1,0 +1,2 @@
+recursive-include dm *
+global-exclude *pyc
