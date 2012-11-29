@@ -7,7 +7,7 @@ class DMSiteImportView(BrowserView):
   def __call__(self):
     print 'Hello, world!'
     site = 'www.dm.org'
-    page = '/site-homepage'
+    page = '/foobar-homepage'
     obj = ImportObject(site, page)
     return obj.body
 	
@@ -22,4 +22,12 @@ class ImportObject:
     conn = httplib.HTTPConnection(site)
     conn.request('GET', "%s/CookedBody" % page)
     r = conn.getresponse()
+    if r.status == 404:
+      msg = "Server at %s returned 404 for page %s" % (site, page)
+      raise NotFoundError, msg
     return r.read()
+
+
+class NotFoundError(Exception):
+  pass
+
