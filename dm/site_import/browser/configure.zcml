@@ -8,7 +8,7 @@
   <!-- -*- extra stuff goes here -*- -->
   <browser:page
       for="*"
-      name="hello"
+      name="site_import"
       permission="zope2.Public"
       class=".views.DMSiteImportView"
       />
