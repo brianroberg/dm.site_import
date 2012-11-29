@@ -1,17 +1,4 @@
-.. contents::
-
-.. Note!
-   -----
-   Update the following URLs to point to your:
-
-   - code repository
-   - bug tracker
-   - questions/comments feedback mail
-   (do not set a real mail, to avoid spams)
-
-   Or remove it if not used.
-
-- Code repository: http://svn.somewhere.com/...
-- Questions and comments to somemailing_list
-- Report bugs at http://bug.somewhere.com/..
-
+This package is a collection of code I'm using to migrate DM's old
+Plone sites to a new version of Plone.  Feel free to look around,
+but be advised that re-usability is not a priority for me in this
+project.
