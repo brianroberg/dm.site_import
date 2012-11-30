@@ -12,9 +12,12 @@ class DMSiteImportView(BrowserView):
     # original site).
     self.objects_seen = {}
 
-    self.conn = httplib.HTTPConnection('www.dm.org')
-    page = '/site-homepage'
-    return "Return value is %s." % self.is_already_retrieved('', page)
+    site = 'www.dm.org'
+    hp = RemoteObject(site, '', '/site-homepage')
+    return hp.absolute_url
+
+    #page = '/site-homepage'
+    #return "Return value is %s." % self.is_already_retrieved('', page)
 
   def is_already_retrieved(self, base_url, page):
     url = self.make_http_request(base_url, page, 'absolute_url')
@@ -23,13 +26,6 @@ class DMSiteImportView(BrowserView):
     else:
       return False
     
-  def make_http_request(self, base_url, page, suffix=""):
-    self.conn.request('GET', "%s/%s" % (page, suffix))
-    r = self.conn.getresponse()
-    if r.status == 404:
-      msg = "Server at %s returned 404 for page %s" % (site, page)
-      raise NotFoundError, msg
-    return r.read()
 	
 
 
@@ -42,3 +38,22 @@ class ImportObject:
 class NotFoundError(Exception):
   pass
 
+
+class RemoteObject:
+
+  def __init__(self, site, base_url, link):
+    self.conn = httplib.HTTPConnection(site)
+    self.conn.request('GET', "%s/%s/absolute_url" % (base_url, link))
+    r = self.conn.getresponse()
+    self.absolute_url = r.read()
+
+  def get_cooked_body(self):
+    return self.make_http_request('CookedBody')
+
+  def make_http_request(self, suffix=""):
+    self.conn.request('GET', "%s/%s" % (self.absolute_url, suffix))
+    r = self.conn.getresponse()
+    if r.status == 404:
+      msg = "Server at %s returned 404 for page %s" % (site, page)
+      raise NotFoundError, msg
+    return r.read()
