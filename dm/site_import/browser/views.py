@@ -10,6 +10,9 @@ class DMSiteImportView(BrowserView):
     # Each value is an Import Object.
     # Each key is the object's absolute_url (as returned in the
     # original site).
+    # TODO: There are some URLs we shouldn't try to retrieve because
+    # they don't exist in Zope, e.g. dm.org/donate. I could hard-code
+    # those URLs here.
     self.objects_seen = {}
 
     site = 'www.dm.org'
@@ -55,7 +58,14 @@ class RemoteObject:
 
   def __init__(self, site, base_url, link):
     self.site = site
-    self.page = link
+
+    # TODO: Do proper preparation of the relative URL, including making
+    # use of base_url.
+    if link[0] == '/':
+      self.page = link[1:]
+    else:
+      self.page = link
+
     self.conn = httplib.HTTPConnection(site)
     self.conn.request('GET', "%s/%s/absolute_url" % (base_url, link))
     self.absolute_url = self.get_http_response()
