@@ -8,6 +8,9 @@ class HTTPError(Exception):
 class NotFoundError(HTTPError):
   pass
 
+class OffsiteError(HTTPError):
+  pass
+
 class RemoteResource:
 
   def __str__(self):
@@ -38,6 +41,12 @@ class RemoteLinkTarget(RemoteResource):
     self.link = link
     full_url = urlparse.urljoin(base_url, link)
     print "full_url = %s" % full_url
+
+    # Check whether this is an offsite link.
+    netloc = urlparse.urlparse(link).netloc 
+    if netloc and (netloc != site):
+      msg = "Resource %s not part of site %s" % (link, site)
+      raise OffsiteError, msg
 
     self.conn = httplib.HTTPConnection(site)
     self.conn.request('GET', "%s/absolute_url" % (full_url))
