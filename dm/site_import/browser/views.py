@@ -17,14 +17,14 @@ class DMSiteImportView(BrowserView):
 
     site = 'www.dm.org'
     hp = RemoteObject(site, '', '/site-homepage')
-    self.objects_seen[hp.absolute_url] = hp
+    self.objects_seen[hp.absolute_url] = ImportObject(hp.absolute_url)
 
     targets = hp.get_link_targets()
     for t in targets:
       try:
         obj = RemoteObject(site, '', t)
         if obj.absolute_url not in self.objects_seen:
-          self.objects_seen[obj.absolute_url] = obj
+          self.objects_seen[obj.absolute_url] = ImportObject(obj.absolute_url)
       except HTTPError:
         continue
     return self.objects_seen.keys()
