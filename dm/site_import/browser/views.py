@@ -19,11 +19,13 @@ class DMSiteImportView(BrowserView):
     self.objects_seen[hp.absolute_url] = ImportObject(hp.absolute_url)
     self.crawl(hp)
 
-    return self.objects_seen.keys()
+    return "\n".join(self.objects_seen.keys())
 
   def crawl(self, remote_obj):
     targets = remote_obj.get_link_targets()
     for t in targets:
+      if not t:
+        continue
       try:
         rlt = RemoteLinkTarget(remote_obj.get_site(),
                                remote_obj.absolute_url, t)

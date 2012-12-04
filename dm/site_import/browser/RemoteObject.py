@@ -28,9 +28,20 @@ class RemoteResource:
       msg = "Server at %s returned 404 for resource %s" % (self.site, self)
       raise NotFoundError, msg
     elif r.status != 200:
-      msg = "Server at %s returned error status %s for resource %s" % (self.site, r.status, self)
+      try:
+	msg = "Server at %s returned error status %s for resource %s" % (self.site, r.status, self)
+      except AttributeError:
+        msg = "Server returned error status %s" % r.status
       raise HTTPError, msg
     return r.read()
+
+  def is_valid_url(self, url):
+    parse_result = urlparse.urlparse(url)
+    if parse_result.netloc == '':
+      return False
+    if parse_result.scheme[:4] != 'http':
+      return False
+    return True
 
 
 class RemoteLinkTarget(RemoteResource):
@@ -39,7 +50,7 @@ class RemoteLinkTarget(RemoteResource):
   def __init__(self, site, base_url, link):
     self.site = site
     self.link = link
-    full_url = urlparse.urljoin(base_url, link)
+    full_url = urlparse.urljoin(base_url, link, allow_fragments=False)
     print "full_url = %s" % full_url
 
     # Check whether this is an offsite link.
@@ -49,9 +60,17 @@ class RemoteLinkTarget(RemoteResource):
       raise OffsiteError, msg
 
     self.conn = httplib.HTTPConnection(site)
-    self.conn.request('GET', "%s/absolute_url" % (full_url))
+    request_url = urlparse.urljoin(full_url,
+                                   'absolute_url',
+                                   allow_fragments=False)
+    print "request_url = %s" % request_url
+    self.conn.request('GET', request_url)
+                      
     self.absolute_url = self.get_http_response()
 
+    if not self.is_valid_url(self.absolute_url):
+      print "base_url = %s, link = %s" % (base_url, link)
+      raise ValueError, "Invalid URL %s" % self.absolute_url
 
 class RemoteObject(RemoteResource):
   """A piece of content retrieved from the remote site."""
@@ -60,28 +79,44 @@ class RemoteObject(RemoteResource):
     site = urlparse.urlparse(absolute_url).netloc
     self.conn = httplib.HTTPConnection(site)
     self.absolute_url = absolute_url
+    if not self.is_valid_url(self.absolute_url):
+      raise ValueError, "Invalid URL %s" % self.absolute_url[:256]
 
     self.obj_type = self.make_http_request('Type')
 
-    if self.obj_type == 'Page':
+    if self.obj_type in ['News Item', 'Page']:
       self.soup = BeautifulSoup(self.get_cooked_body())
+    elif self.obj_type in ['Folder', 'Large Folder']:
+      self.soup = BeautifulSoup(self.get_folder_body())
+    elif self.obj_type in ['File', 'Image', 'Plone Site']:
+      self.soup = BeautifulSoup('')
+    # TODO: fix this. collections should be able to report their
+    # contents.  But there's an old error in the site that prevents
+    # folder_contents from working.
+    elif self.obj_type == 'Collection':
+      self.soup = BeautifulSoup('')
 
   def get_cooked_body(self):
     return self.make_http_request('CookedBody')
 
+  def get_folder_body(self):
+    return self.make_http_request('folder_contents')
+
   def make_http_request(self, suffix=""):
+    print "make_http_request: url = %s, suffix = %s" % (self.absolute_url, suffix)
     self.conn.request('GET', "%s/%s" % (self.absolute_url, suffix))
     return self.get_http_response()
 
   def get_link_targets(self):
-    # Temporary workaround to limit crawling to pages
-    try:
-      return [link.get('href') for link in self.get_links()]
-    except AttributeError:
-      return []
+    return [link.get('href') for link in self.get_links()]
 
   def get_links(self):
-    return [link for link in self.soup.find_all('a')]
+    try:
+      return [link for link in self.soup.find_all('a')]
+    except AttributeError, msg:
+      print "obj_type = %s" % self.obj_type
+      raise AttributeError, msg
+      
 
   def get_site(self):
     return urlparse.urlparse(self.absolute_url).netloc
