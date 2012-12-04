@@ -28,18 +28,6 @@ class DMSiteImportView(BrowserView):
         continue
     return self.objects_seen.keys()
 
-    #page = '/site-homepage'
-    #return "Return value is %s." % self.is_already_retrieved('', page)
-
-  def is_already_retrieved(self, base_url, page):
-    url = self.make_http_request(base_url, page, 'absolute_url')
-    if url in self.objects_seen.keys():
-      return True
-    else:
-      return False
-    
-	
-
 
 class ImportObject:
 
