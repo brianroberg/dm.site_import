@@ -30,6 +30,7 @@ class DMSiteImportView(BrowserView):
         if rlt.absolute_url not in self.objects_seen:
           # limit extent of crawling during development
           if len(self.objects_seen.keys()) > 100:
+            print "100 objects seen, breaking loop"
             break
 
           self.objects_seen[rlt.absolute_url] = ImportObject(rlt.absolute_url)
