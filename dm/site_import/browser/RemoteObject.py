@@ -8,23 +8,47 @@ class HTTPError(Exception):
 class NotFoundError(HTTPError):
   pass
 
-class RemoteObject:
+class RemoteResource:
+
+  def __str__(self):
+    if isinstance(self, RemoteObject):
+      return "RemoteObject at %s" % self.absolute_url
+    elif isinstance(self, RemoteLinkTarget):
+      return "RemoteLinkTarget at %s" % self.link
+    else:
+      return "unknown RemoteResource object"
+
+  def get_http_response(self):
+    r = self.conn.getresponse()
+    # TODO: add base_url to error message
+    if r.status == 404:
+      msg = "Server at %s returned 404 for resource %s" % (self.site, self)
+      raise NotFoundError, msg
+    elif r.status != 200:
+      msg = "Server at %s returned error status %s for resource %s" % (self.site, r.status, self.absolute_url)
+      raise HTTPError, msg
+    return r.read()
+
+
+class RemoteLinkTarget(RemoteResource):
 
   def __init__(self, site, base_url, link):
     self.site = site
-
-    # TODO: Do proper preparation of the relative URL, including making
-    # use of base_url.
-    url = urlparse.urljoin(base_url, link)
-    print "url = %s" % url
-    if link[0] == '/':
-      self.page = link[1:]
-    else:
-      self.page = link
+    self.link = link
+    full_url = urlparse.urljoin(base_url, link)
+    print "full_url = %s" % full_url
 
     self.conn = httplib.HTTPConnection(site)
-    self.conn.request('GET', "%s/%s/absolute_url" % (base_url, link))
+    self.conn.request('GET', "%s/absolute_url" % (full_url))
     self.absolute_url = self.get_http_response()
+
+
+class RemoteObject(RemoteResource):
+
+  def __init__(self, absolute_url):
+    site = urlparse.urlparse(absolute_url).netloc
+    self.conn = httplib.HTTPConnection(site)
+    self.absolute_url = absolute_url
 
     self.obj_type = self.make_http_request('Type')
 
@@ -34,17 +58,9 @@ class RemoteObject:
   def get_cooked_body(self):
     return self.make_http_request('CookedBody')
 
-  def get_http_response(self):
-    r = self.conn.getresponse()
-    # TODO: add base_url to error message
-    if r.status == 404:
-      msg = "Server at %s returned 404 for page %s" % (self.site, self.page)
-      raise NotFoundError, msg
-    elif r.status != 200:
-      msg = "Server at %s returned error status %s for page %s" % (self.site, r.status, self.page)
-      raise HTTPError, msg
-    return r.read()
-
+  def make_http_request(self, suffix=""):
+    self.conn.request('GET', "%s/%s" % (self.absolute_url, suffix))
+    return self.get_http_response()
 
   def get_link_targets(self):
     return [link.get('href') for link in self.get_links()]
@@ -52,6 +68,3 @@ class RemoteObject:
   def get_links(self):
     return [link for link in self.soup.find_all('a')]
 
-  def make_http_request(self, suffix=""):
-    self.conn.request('GET', "%s/%s" % (self.absolute_url, suffix))
-    return self.get_http_response()

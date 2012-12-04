@@ -1,5 +1,5 @@
 from Products.Five.browser import BrowserView
-from RemoteObject import HTTPError, NotFoundError, RemoteObject
+from RemoteObject import HTTPError, NotFoundError, RemoteLinkTarget, RemoteObject
 
 class DMSiteImportView(BrowserView):
 
@@ -15,15 +15,15 @@ class DMSiteImportView(BrowserView):
     self.objects_seen = {}
 
     site = 'www.dm.org'
-    hp = RemoteObject(site, '', '/about-us/default-view-no-title')
+    hp = RemoteObject('http://www.dm.org/site-homepage')
     self.objects_seen[hp.absolute_url] = ImportObject(hp.absolute_url)
 
     targets = hp.get_link_targets()
     for t in targets:
       try:
-        obj = RemoteObject(site, hp.absolute_url, t)
-        if obj.absolute_url not in self.objects_seen:
-          self.objects_seen[obj.absolute_url] = ImportObject(obj.absolute_url)
+        rlt = RemoteLinkTarget(site, hp.absolute_url, t)
+        if rlt.absolute_url not in self.objects_seen:
+          self.objects_seen[rlt.absolute_url] = ImportObject(rlt.absolute_url)
       except HTTPError:
         continue
     return self.objects_seen.keys()
