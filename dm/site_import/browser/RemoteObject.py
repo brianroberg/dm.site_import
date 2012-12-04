@@ -25,12 +25,13 @@ class RemoteResource:
       msg = "Server at %s returned 404 for resource %s" % (self.site, self)
       raise NotFoundError, msg
     elif r.status != 200:
-      msg = "Server at %s returned error status %s for resource %s" % (self.site, r.status, self.absolute_url)
+      msg = "Server at %s returned error status %s for resource %s" % (self.site, r.status, self)
       raise HTTPError, msg
     return r.read()
 
 
 class RemoteLinkTarget(RemoteResource):
+  """Represents a link we've found on the remote site."""
 
   def __init__(self, site, base_url, link):
     self.site = site
@@ -44,6 +45,7 @@ class RemoteLinkTarget(RemoteResource):
 
 
 class RemoteObject(RemoteResource):
+  """A piece of content retrieved from the remote site."""
 
   def __init__(self, absolute_url):
     site = urlparse.urlparse(absolute_url).netloc
@@ -63,8 +65,14 @@ class RemoteObject(RemoteResource):
     return self.get_http_response()
 
   def get_link_targets(self):
-    return [link.get('href') for link in self.get_links()]
+    # Temporary workaround to limit crawling to pages
+    try:
+      return [link.get('href') for link in self.get_links()]
+    except AttributeError:
+      return []
 
   def get_links(self):
     return [link for link in self.soup.find_all('a')]
 
+  def get_site(self):
+    return urlparse.urlparse(self.absolute_url).netloc

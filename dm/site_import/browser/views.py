@@ -17,16 +17,25 @@ class DMSiteImportView(BrowserView):
     site = 'www.dm.org'
     hp = RemoteObject('http://www.dm.org/site-homepage')
     self.objects_seen[hp.absolute_url] = ImportObject(hp.absolute_url)
+    self.crawl(hp)
 
-    targets = hp.get_link_targets()
+    return self.objects_seen.keys()
+
+  def crawl(self, remote_obj):
+    targets = remote_obj.get_link_targets()
     for t in targets:
       try:
-        rlt = RemoteLinkTarget(site, hp.absolute_url, t)
+        rlt = RemoteLinkTarget(remote_obj.get_site(),
+                               remote_obj.absolute_url, t)
         if rlt.absolute_url not in self.objects_seen:
+          # limit extent of crawling during development
+          if len(self.objects_seen.keys()) > 100:
+            break
+
           self.objects_seen[rlt.absolute_url] = ImportObject(rlt.absolute_url)
+          self.crawl(RemoteObject(rlt.absolute_url))
       except HTTPError:
         continue
-    return self.objects_seen.keys()
 
 
 class ImportObject:
