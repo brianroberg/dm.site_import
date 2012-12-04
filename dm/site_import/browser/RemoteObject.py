@@ -1,5 +1,6 @@
 from bs4 import BeautifulSoup
 import httplib
+import urlparse
 
 class HTTPError(Exception):
   pass
@@ -14,6 +15,8 @@ class RemoteObject:
 
     # TODO: Do proper preparation of the relative URL, including making
     # use of base_url.
+    url = urlparse.urljoin(base_url, link)
+    print "url = %s" % url
     if link[0] == '/':
       self.page = link[1:]
     else:
