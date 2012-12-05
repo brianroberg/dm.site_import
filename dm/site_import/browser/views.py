@@ -44,6 +44,11 @@ class DMSiteImportView(BrowserView):
             import_obj = ImportFolder(ro, self)
             self.objects_seen[rlt.absolute_url] = import_obj
             import_obj.create()            
+          elif ro.obj_type == 'Image':
+            import_obj = ImportImage(ro, self)
+            self.objects_seen[rlt.absolute_url] = import_obj
+            import_obj.create()            
+            continue # Nothing to crawl within an image 
           else:
             print "%s appears to be a %s, no handler yet" % (ro.absolute_url, ro.obj_type)
 	    self.objects_seen[rlt.absolute_url] = ImportObject(ro, self)
@@ -64,6 +69,19 @@ class ImportFolder(ImportObject):
   def create(self):
     print "Running create() for ImportFolder %s" % self.absolute_url
     self.view_obj.context.invokeFactory('Folder', self.remote_obj.shortname)
+    obj = self.view_obj.context[self.remote_obj.shortname]
+    obj.setTitle(self.remote_obj.title)
+    obj.reindexObject()
+
+class ImportImage(ImportObject):
+
+  def create(self):
+    print "Running create() for ImportImage %s" % self.absolute_url
+    self.view_obj.context.invokeFactory('Image', self.remote_obj.shortname)
+    obj = self.view_obj.context[self.remote_obj.shortname]
+    obj.setTitle(self.remote_obj.title)
+    obj.setImage(self.remote_obj.image)
+    obj.reindexObject()
 
 
 class ImportPage(ImportObject):
@@ -71,6 +89,7 @@ class ImportPage(ImportObject):
   def create(self):
     print "Running create() for ImportPage %s" % self.absolute_url
     self.view_obj.context.invokeFactory('Document', self.remote_obj.shortname)
-    obj = context[self.remote_obj.shortname]
+    obj = self.view_obj.context[self.remote_obj.shortname]
+    obj.setTitle(self.remote_obj.title)
     obj.setText(self.remote_obj.get_cooked_body())
-    
+    obj.reindexObject()

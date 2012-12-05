@@ -92,7 +92,9 @@ class RemoteObject(RemoteResource):
       self.soup = BeautifulSoup(self.get_cooked_body())
     elif self.obj_type in ['Folder', 'Large Folder']:
       self.soup = BeautifulSoup(self.get_folder_body())
-    elif self.obj_type in ['File', 'Image', 'Plone Site']:
+    elif self.obj_type == 'Image':
+      self.image = self.make_http_request('image')
+    elif self.obj_type in ['File', 'Plone Site']:
       self.soup = BeautifulSoup('')
     # TODO: fix this. collections should be able to report their
     # contents.  But there's an old error in the site that prevents
