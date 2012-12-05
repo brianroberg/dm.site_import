@@ -82,10 +82,9 @@ class RemoteObject(RemoteResource):
 
     # Retrieve the title and id (which we'll call "shortname")
     title_and_id = self.make_http_request('title_and_id')
-    match = re.match('(.*)\((.*)\)', title_and_id)
-    self.title, self.shortname = match.groups()
-    self.title = self.title.strip()
-    self.shortname = self.shortname.strip()
+    match = re.match('(.*)(\s+)\((.*)\)', title_and_id)
+    self.title = match.group(1).strip()
+    self.shortname = match.group(3).strip()
     
     self.obj_type = self.make_http_request('Type')
 
