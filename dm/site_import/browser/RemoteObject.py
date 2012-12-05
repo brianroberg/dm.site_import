@@ -1,5 +1,6 @@
 from bs4 import BeautifulSoup
 import httplib
+import re
 import urlparse
 
 class HTTPError(Exception):
@@ -51,7 +52,6 @@ class RemoteLinkTarget(RemoteResource):
     self.site = site
     self.link = link
     full_url = urlparse.urljoin(base_url, link, allow_fragments=False)
-    print "full_url = %s" % full_url
 
     # Check whether this is an offsite link.
     netloc = urlparse.urlparse(link).netloc 
@@ -63,13 +63,11 @@ class RemoteLinkTarget(RemoteResource):
     request_url = urlparse.urljoin(full_url,
                                    'absolute_url',
                                    allow_fragments=False)
-    print "request_url = %s" % request_url
     self.conn.request('GET', request_url)
                       
     self.absolute_url = self.get_http_response()
 
     if not self.is_valid_url(self.absolute_url):
-      print "base_url = %s, link = %s" % (base_url, link)
       raise ValueError, "Invalid URL %s" % self.absolute_url
 
 class RemoteObject(RemoteResource):
@@ -82,6 +80,13 @@ class RemoteObject(RemoteResource):
     if not self.is_valid_url(self.absolute_url):
       raise ValueError, "Invalid URL %s" % self.absolute_url[:256]
 
+    # Retrieve the title and id (which we'll call "shortname")
+    title_and_id = self.make_http_request('title_and_id')
+    match = re.match('(.*)\((.*)\)', title_and_id)
+    self.title, self.shortname = match.groups()
+    self.title = self.title.strip()
+    self.shortname = self.shortname.strip()
+    
     self.obj_type = self.make_http_request('Type')
 
     if self.obj_type in ['News Item', 'Page']:
@@ -102,11 +107,6 @@ class RemoteObject(RemoteResource):
   def get_folder_body(self):
     return self.make_http_request('folder_contents')
 
-  def make_http_request(self, suffix=""):
-    print "make_http_request: url = %s, suffix = %s" % (self.absolute_url, suffix)
-    self.conn.request('GET', "%s/%s" % (self.absolute_url, suffix))
-    return self.get_http_response()
-
   def get_link_targets(self):
     return [link.get('href') for link in self.get_links()]
 
@@ -116,7 +116,11 @@ class RemoteObject(RemoteResource):
     except AttributeError, msg:
       print "obj_type = %s" % self.obj_type
       raise AttributeError, msg
-      
 
   def get_site(self):
     return urlparse.urlparse(self.absolute_url).netloc
+
+  def make_http_request(self, suffix=""):
+    #print "make_http_request: url = %s, suffix = %s" % (self.absolute_url, suffix)
+    self.conn.request('GET', "%s/%s" % (self.absolute_url, suffix))
+    return self.get_http_response()
