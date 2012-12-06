@@ -1,7 +1,8 @@
 from Products.Five.browser import BrowserView
 from ImportObject import (ImportObject, ImportFile, ImportFolder, 
                           ImportImage, ImportPage)
-from RemoteObject import HTTPError, NotFoundError, RemoteLinkTarget, RemoteObject
+from RemoteObject import (HTTPError, NotFoundError, RemoteLinkTarget,
+                          RemoteObject)
 
 class DMSiteImportView(BrowserView):
 
