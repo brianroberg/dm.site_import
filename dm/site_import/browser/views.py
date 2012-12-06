@@ -16,7 +16,8 @@ class DMSiteImportView(BrowserView):
 
     site = 'www.dm.org'
     hp = RemoteObject('http://www.dm.org/site-homepage')
-    self.objects_seen[hp.absolute_url] = ImportObject(hp, self)
+    self.objects_seen[hp.absolute_url] = ImportPage(hp, self)
+    self.objects_seen[hp.absolute_url].create()
     self.crawl(hp)
 
     return "\n".join(self.objects_seen.keys())
@@ -49,6 +50,11 @@ class DMSiteImportView(BrowserView):
             self.objects_seen[rlt.absolute_url] = import_obj
             import_obj.create()            
             continue # Nothing to crawl within an image 
+          elif ro.obj_type == 'File':
+            import_obj = ImportFile(ro, self)
+            self.objects_seen[rlt.absolute_url] = import_obj
+            import_obj.create()            
+            continue # Nothing to crawl within a file
           else:
             print "%s appears to be a %s, no handler yet" % (ro.absolute_url, ro.obj_type)
 	    self.objects_seen[rlt.absolute_url] = ImportObject(ro, self)
@@ -63,6 +69,16 @@ class ImportObject:
     self.absolute_url = remote_obj.absolute_url
     self.remote_obj = remote_obj
     self.view_obj = view_obj
+
+class ImportFile(ImportObject):
+
+  def create(self):
+    print "Running create() for ImportFile %s" % self.absolute_url
+    self.view_obj.context.invokeFactory('File', self.remote_obj.shortname)
+    obj = self.view_obj.context[self.remote_obj.shortname]
+    obj.setTitle(self.remote_obj.title)
+    obj.setFile(self.remote_obj.file_data)
+    obj.reindexObject()
 
 class ImportFolder(ImportObject):
 

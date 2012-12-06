@@ -94,7 +94,9 @@ class RemoteObject(RemoteResource):
       self.soup = BeautifulSoup(self.get_folder_body())
     elif self.obj_type == 'Image':
       self.image = self.make_http_request('image')
-    elif self.obj_type in ['File', 'Plone Site']:
+    elif self.obj_type == 'File':
+      self.file_data = self.make_http_request('getFile')
+    elif self.obj_type == 'Plone Site':
       self.soup = BeautifulSoup('')
     # TODO: fix this. collections should be able to report their
     # contents.  But there's an old error in the site that prevents
@@ -122,6 +124,5 @@ class RemoteObject(RemoteResource):
     return urlparse.urlparse(self.absolute_url).netloc
 
   def make_http_request(self, suffix=""):
-    #print "make_http_request: url = %s, suffix = %s" % (self.absolute_url, suffix)
     self.conn.request('GET', "%s/%s" % (self.absolute_url, suffix))
     return self.get_http_response()
