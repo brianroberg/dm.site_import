@@ -3,6 +3,7 @@ from ImportObject import (ImportObject, ImportFile, ImportFolder,
                           ImportImage, ImportPage)
 from RemoteObject import (HTTPError, NotFoundError, RemoteLinkTarget,
                           RemoteObject)
+from collections import deque
 
 class DMSiteImportView(BrowserView):
 
@@ -26,7 +27,16 @@ class DMSiteImportView(BrowserView):
     return "\n".join(self.objects_seen.keys())
 
   def crawl(self, remote_obj):
-    targets = remote_obj.get_link_targets()
+    targets = deque(remote_obj.get_link_targets())
+    # We will crawl not only this object, but also:
+    #    1. Any objects above it in the containment hierarchy
+    #    2. Any objects it links to
+
+    # Pre-load the list of objects we'll check with objects above
+    # this object in the containment hierarchy.
+    if remote_obj.relative_url > 1:
+      targets.extendleft(reversed(remote_obj.relative_url[:-1]))
+
     for t in targets:
       if not t:
         continue
@@ -35,8 +45,8 @@ class DMSiteImportView(BrowserView):
                                remote_obj.absolute_url, t)
         if rlt.absolute_url not in self.objects_seen:
           # limit extent of crawling during development
-          if len(self.objects_seen.keys()) > 40:
-            print "40 objects seen, breaking loop"
+          if len(self.objects_seen.keys()) > 200:
+            print "200 objects seen, breaking loop"
             break
 
           ro = RemoteObject(rlt.absolute_url)
