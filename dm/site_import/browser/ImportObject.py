@@ -2,6 +2,8 @@ class ImportObject(object):
 
   def __init__(self, remote_obj, view_obj):
     self.absolute_url = remote_obj.absolute_url
+    self.relative_url = remote_obj.relative_url
+    print "relative_url = %s" % str(self.relative_url)
     self.remote_obj = remote_obj
     self.view_obj = view_obj
 

@@ -79,6 +79,8 @@ class RemoteObject(RemoteResource):
     self.absolute_url = absolute_url
     if not self.is_valid_url(self.absolute_url):
       raise ValueError, "Invalid URL %s" % self.absolute_url[:256]
+    relative_url_str = self.make_http_request('virtual_url_path')
+    self.relative_url = relative_url_str.split('/')
 
     # Retrieve the title and id (which we'll call "shortname")
     title_and_id = self.make_http_request('title_and_id')
