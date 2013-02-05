@@ -52,6 +52,7 @@ class RemoteLinkTarget(RemoteResource):
     self.site = site
     self.link = link
     full_url = urlparse.urljoin(base_url, link, allow_fragments=False)
+    print "full_url = %s" % full_url
 
     # Check whether this is an offsite link.
     netloc = urlparse.urlparse(link).netloc 
@@ -60,9 +61,8 @@ class RemoteLinkTarget(RemoteResource):
       raise OffsiteError, msg
 
     self.conn = httplib.HTTPConnection(site)
-    request_url = urlparse.urljoin(full_url,
-                                   'absolute_url',
-                                   allow_fragments=False)
+    request_url = "%s/absolute_url" % full_url
+    print "request_url = %s" % request_url
     self.conn.request('GET', request_url)
                       
     self.absolute_url = self.get_http_response()
@@ -113,6 +113,7 @@ class RemoteObject(RemoteResource):
     return self.make_http_request('folder_contents')
 
   def get_link_targets(self):
+    """Return a list of URLs linked to in the remote object."""
     return [link.get('href') for link in self.get_links()]
 
   def get_links(self):
