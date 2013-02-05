@@ -13,10 +13,12 @@ class DMSiteImportView(BrowserView):
     # Each value is an Import Object.
     # Each key is the object's absolute_url (as returned in the
     # original site).
+    self.objects_seen = {}
+
     # TODO: There are some URLs we shouldn't try to retrieve because
     # they don't exist in Zope, e.g. dm.org/donate. I could hard-code
     # those URLs here.
-    self.objects_seen = {}
+    self.skip_list = ['http://www.dm.org/donate']
 
     site = 'www.dm.org'
     hp = RemoteObject('http://www.dm.org/site-homepage')
@@ -26,53 +28,70 @@ class DMSiteImportView(BrowserView):
 
     return "\n".join(self.objects_seen.keys())
 
+  def add(self, remote_obj):
+    """Add a remote object to the local site."""
+
+    #import pdb; pdb.set_trace()
+
+    # Check whether the object's parent has already been added.
+    # If not, we need to add it first.
+    parent_url = '/'.join(remote_obj.absolute_url.split('/')[:-1])
+    if (len(remote_obj.relative_url) > 1) and self.needs_crawled(parent_url):
+      self.add(RemoteObject(parent_url))
+
+    if remote_obj.obj_type == 'Page':
+      ip = ImportPage(remote_obj, self)
+      self.objects_seen[remote_obj.absolute_url] = ip
+      ip.create()            
+      self.crawl(remote_obj)
+    elif remote_obj.obj_type == 'Folder':
+      import_obj = ImportFolder(remote_obj, self)
+      self.objects_seen[remote_obj.absolute_url] = import_obj
+      import_obj.create()            
+      self.crawl(remote_obj)
+    elif remote_obj.obj_type == 'Image':
+      import_obj = ImportImage(remote_obj, self)
+      self.objects_seen[remote_obj.absolute_url] = import_obj
+      import_obj.create()            
+      # Nothing to crawl within an image
+    elif remote_obj.obj_type == 'File':
+      import_obj = ImportFile(remote_obj, self)
+      self.objects_seen[remote_obj.absolute_url] = import_obj
+      import_obj.create()            
+      # Nothing to crawl within a file
+    else:
+      print "%s appears to be a %s, no handler yet" % (remote_obj.absolute_url, remote_obj.obj_type)
+      self.objects_seen[remote_obj.absolute_url] = ImportObject(remote_obj, self)
+
   def crawl(self, remote_obj):
+    print "Running **crawl** on %s" % remote_obj.absolute_url
     targets = deque(remote_obj.get_link_targets())
     # We will crawl not only this object, but also:
     #    1. Any objects above it in the containment hierarchy
     #    2. Any objects it links to
-
-    # Pre-load the list of objects we'll check with objects above
-    # this object in the containment hierarchy.
-    if remote_obj.relative_url > 1:
-      targets.extendleft(reversed(remote_obj.relative_url[:-1]))
 
     for t in targets:
       if not t:
         continue
       try:
         rlt = RemoteLinkTarget(remote_obj.get_site(),
-                               remote_obj.absolute_url, t)
-        if rlt.absolute_url not in self.objects_seen:
-          # limit extent of crawling during development
-          if len(self.objects_seen.keys()) > 200:
-            print "200 objects seen, breaking loop"
-            break
-
-          ro = RemoteObject(rlt.absolute_url)
-          if ro.obj_type == 'Page':
-            ip = ImportPage(ro, self)
-            self.objects_seen[rlt.absolute_url] = ip
-            ip.create()            
-          elif ro.obj_type == 'Folder':
-            import_obj = ImportFolder(ro, self)
-            self.objects_seen[rlt.absolute_url] = import_obj
-            import_obj.create()            
-          elif ro.obj_type == 'Image':
-            import_obj = ImportImage(ro, self)
-            self.objects_seen[rlt.absolute_url] = import_obj
-            import_obj.create()            
-            continue # Nothing to crawl within an image 
-          elif ro.obj_type == 'File':
-            import_obj = ImportFile(ro, self)
-            self.objects_seen[rlt.absolute_url] = import_obj
-            import_obj.create()            
-            continue # Nothing to crawl within a file
-          else:
-            print "%s appears to be a %s, no handler yet" % (ro.absolute_url, ro.obj_type)
-	    self.objects_seen[rlt.absolute_url] = ImportObject(ro, self)
-          self.crawl(ro)
-      except HTTPError:
+			       remote_obj.absolute_url, t)
+      except (HTTPError, ValueError):
         continue
 
+      if self.needs_crawled(rlt.absolute_url):
+	# limit extent of crawling during development
+	if len(self.objects_seen.keys()) > 200:
+	  print "200 objects seen, breaking loop"
+	  break
 
+	self.add(RemoteObject(rlt.absolute_url))
+
+  def needs_crawled(self, url):
+    if url in self.objects_seen:
+      return False
+    if url in self.skip_list:
+      return False
+    if '/folder_contents' in url:
+      return False
+    return True
