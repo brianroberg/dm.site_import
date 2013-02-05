@@ -3,16 +3,21 @@ class ImportObject(object):
   def __init__(self, remote_obj, view_obj):
     self.absolute_url = remote_obj.absolute_url
     self.relative_url = remote_obj.relative_url
-    print "relative_url = %s" % str(self.relative_url)
     self.remote_obj = remote_obj
     self.view_obj = view_obj
 
   def create(self):
     print "Running create() for %s %s" % (self.type_name,
                                           self.absolute_url)
-    self.view_obj.context.invokeFactory(self.type_name,
-                                        self.remote_obj.shortname)
-    self.site_obj = self.view_obj.context[self.remote_obj.shortname]
+    #import pdb; pdb.set_trace()
+    if len(self.relative_url) > 1:
+      relative_url_str = '/'.join(self.relative_url[:-1])
+      container = self.view_obj.context.unrestrictedTraverse(relative_url_str)
+    else:
+      container = self.view_obj.context
+    container.invokeFactory(self.type_name,
+                            self.remote_obj.shortname)
+    self.site_obj = container[self.remote_obj.shortname]
     self.site_obj.setTitle(self.remote_obj.title)
 
 
