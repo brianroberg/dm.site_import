@@ -52,7 +52,6 @@ class RemoteLinkTarget(RemoteResource):
     self.site = site
     self.link = link
     full_url = urlparse.urljoin(base_url, link, allow_fragments=False)
-    print "full_url = %s" % full_url
 
     # Check whether this is an offsite link.
     netloc = urlparse.urlparse(link).netloc 
@@ -62,7 +61,6 @@ class RemoteLinkTarget(RemoteResource):
 
     self.conn = httplib.HTTPConnection(site)
     request_url = "%s/absolute_url" % full_url
-    print "request_url = %s" % request_url
     self.conn.request('GET', request_url)
                       
     self.absolute_url = self.get_http_response()
