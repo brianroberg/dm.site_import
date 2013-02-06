@@ -12,20 +12,10 @@ from dm.site_import.browser.ImportObject import (ImportObject, ImportFile,
                                                  ImportPage)
 from dm.site_import.browser.RemoteObject import (HTTPError, NotFoundError,
                                                  RemoteLinkTarget,
-                                                 RemoteObject)
+                                                 RemoteObject, RemoteResource)
 
 
 def test_suite():
-#    return unittest.TestSuite([
-#
-#        # Demonstrate the main content types
-#        ztc.ZopeDocFileSuite(
-#            'README.txt', package='dm.site_import',
-#            test_class=base.FunctionalTestCase,
-#            optionflags=doctest.REPORT_ONLY_FIRST_FAILURE |
-#                doctest.NORMALIZE_WHITESPACE | doctest.ELLIPSIS),
-#
-#        ])
       suite = unittest.TestSuite()
       suite.addTests([
           unittest.makeSuite(RemoteObjectTesting)
@@ -40,3 +30,9 @@ class RemoteObjectTesting(unittest.TestCase):
     def testAbsoluteUrl(self):
       remote_obj = RemoteObject('http://www.dm.org/site-homepage')
       self.assertEqual(remote_obj.absolute_url, 'http://www.dm.org/site-homepage')
+
+    def test_is_valid_url(self):
+      remote_obj = RemoteObject('http://www.dm.org/site-homepage')
+      self.assertTrue(remote_obj.is_valid_url('http://www.dm.org'))
+      self.assertFalse(remote_obj.is_valid_url(''))
+      self.assertFalse(remote_obj.is_valid_url('<!DOCTYPE html>'))
