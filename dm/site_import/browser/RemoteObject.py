@@ -28,7 +28,7 @@ class RemoteResource:
     if r.status == 404:
       msg = "Server at %s returned 404 for resource %s" % (self.site, self)
       raise NotFoundError, msg
-    elif r.status != 200:
+    elif r.status >= 300:
       try:
 	msg = "Server at %s returned error status %s for resource %s" % (self.site, r.status, self)
       except AttributeError:
