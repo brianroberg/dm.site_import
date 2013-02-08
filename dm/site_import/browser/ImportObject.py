@@ -1,3 +1,6 @@
+class ObjectAlreadyExistsError(ValueError):
+  pass
+
 class ImportObject(object):
 
   def __init__(self, remote_obj, view_obj):
@@ -15,10 +18,13 @@ class ImportObject(object):
       container = self.view_obj.context.unrestrictedTraverse(relative_url_str)
     else:
       container = self.view_obj.context
-    container.invokeFactory(self.type_name,
-                            self.remote_obj.shortname)
-    self.site_obj = container[self.remote_obj.shortname]
-    self.site_obj.setTitle(self.remote_obj.title)
+    if self.remote_obj.shortname in container.objectIds():
+      raise ObjectAlreadyExistsError
+    else:
+      container.invokeFactory(self.type_name,
+			      self.remote_obj.shortname)
+      self.site_obj = container[self.remote_obj.shortname]
+      self.site_obj.setTitle(self.remote_obj.title)
 
 
 class ImportFile(ImportObject):
@@ -28,9 +34,13 @@ class ImportFile(ImportObject):
     ImportObject.__init__(self, remote_obj, view_obj)
 
   def create(self):
-    ImportObject.create(self)
-    self.site_obj.setFile(self.remote_obj.file_data)
-    self.site_obj.reindexObject()
+    try:
+      ImportObject.create(self)
+    except ObjectAlreadyExistsError:
+      print "%s already exists, exiting create()" % self.remote_obj.shortname
+    else:
+      self.site_obj.setFile(self.remote_obj.file_data)
+      self.site_obj.reindexObject()
 
 
 class ImportFolder(ImportObject):
@@ -40,8 +50,12 @@ class ImportFolder(ImportObject):
     ImportObject.__init__(self, remote_obj, view_obj)
 
   def create(self):
-    ImportObject.create(self)
-    self.site_obj.reindexObject()
+    try:
+      ImportObject.create(self)
+    except ObjectAlreadyExistsError:
+      print "%s already exists, exiting create()" % self.remote_obj.shortname
+    else:
+      self.site_obj.reindexObject()
 
 
 class ImportImage(ImportObject):
@@ -51,9 +65,13 @@ class ImportImage(ImportObject):
     ImportObject.__init__(self, remote_obj, view_obj)
 
   def create(self):
-    ImportObject.create(self)
-    self.site_obj.setImage(self.remote_obj.image)
-    self.site_obj.reindexObject()
+    try:
+      ImportObject.create(self)
+    except ObjectAlreadyExistsError:
+      print "%s already exists, exiting create()" % self.remote_obj.shortname
+    else:
+      self.site_obj.setImage(self.remote_obj.image)
+      self.site_obj.reindexObject()
 
 
 class ImportPage(ImportObject):
@@ -63,6 +81,10 @@ class ImportPage(ImportObject):
     ImportObject.__init__(self, remote_obj, view_obj)
 
   def create(self):
-    ImportObject.create(self)
-    self.site_obj.setText(self.remote_obj.get_cooked_body())
-    self.site_obj.reindexObject()
+    try:
+      ImportObject.create(self)
+    except ObjectAlreadyExistsError:
+      print "%s already exists, exiting create()" % self.remote_obj.shortname
+    else:
+      self.site_obj.setText(self.remote_obj.get_cooked_body())
+      self.site_obj.reindexObject()
