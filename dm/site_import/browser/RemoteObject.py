@@ -13,6 +13,7 @@ class OffsiteError(HTTPError):
   pass
 
 class RemoteResource:
+  http_requests = {}
 
   def __str__(self):
     if isinstance(self, RemoteObject):
@@ -59,14 +60,20 @@ class RemoteLinkTarget(RemoteResource):
       msg = "Resource %s not part of site %s" % (link, site)
       raise OffsiteError, msg
 
-    self.conn = httplib.HTTPConnection(site)
     request_url = "%s/absolute_url" % full_url
-    self.conn.request('GET', request_url)
-                      
-    self.absolute_url = self.get_http_response()
+
+    # Check whether we've already looked up this absolute url.
+    if request_url not in RemoteResource.http_requests:
+      self.conn = httplib.HTTPConnection(site)
+      self.conn.request('GET', request_url)
+      self.absolute_url = self.get_http_response()
+      RemoteResource.http_requests[request_url] = self.absolute_url
+    else:
+      self.absolute_url = RemoteResource.http_requests[request_url]
 
     if not self.is_valid_url(self.absolute_url):
       raise ValueError, "Invalid URL %s" % self.absolute_url
+
 
 class RemoteObject(RemoteResource):
   """A piece of content retrieved from the remote site."""
@@ -125,5 +132,12 @@ class RemoteObject(RemoteResource):
     return urlparse.urlparse(self.absolute_url).netloc
 
   def make_http_request(self, suffix=""):
-    self.conn.request('GET', "%s/%s" % (self.absolute_url, suffix))
-    return self.get_http_response()
+    request_url = "%s/%s" % (self.absolute_url, suffix)
+    if request_url not in RemoteResource.http_requests:
+      self.conn.request('GET', request_url)
+      response = self.get_http_response()
+      RemoteResource.http_requests[request_url] = response
+      return response
+    else:
+      return RemoteResource.http_requests[request_url]
+      
