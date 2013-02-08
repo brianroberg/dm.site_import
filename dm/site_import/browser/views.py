@@ -20,6 +20,8 @@ class DMSiteImportView(BrowserView):
     # those URLs here.
     self.skip_list = ['http://www.dm.org/donate']
 
+    self.remove_events_and_news()
+
     site = 'www.dm.org'
     hp = RemoteObject('http://www.dm.org/site-homepage')
     self.objects_seen[hp.absolute_url] = ImportPage(hp, self)
@@ -81,17 +83,31 @@ class DMSiteImportView(BrowserView):
 
       if self.needs_crawled(rlt.absolute_url):
 	# limit extent of crawling during development
-	if len(self.objects_seen.keys()) > 200:
-	  print "200 objects seen, breaking loop"
-	  break
+#	if len(self.objects_seen.keys()) > 100:
+#	  print "100 objects seen, breaking loop"
+#	  break
 
-	self.add(RemoteObject(rlt.absolute_url))
+        try:
+	  self.add(RemoteObject(rlt.absolute_url))
+        except HTTPError:
+          continue
 
   def needs_crawled(self, url):
+    #import pdb; pdb.set_trace()
     if url in self.objects_seen:
       return False
     if url in self.skip_list:
       return False
-    if '/folder_contents' in url:
-      return False
+    # If the URL ends with any of these strings, don't crawl it.
+    skip_suffixes = ['file_view', 'folder_contents']
+    for s in skip_suffixes:
+      if url[len(s) * -1:] == s:
+	return False
     return True
+
+  def remove_events_and_news(self):
+    """Remove these folders in preparation for importing."""
+    try:
+      self.context.manage_delObjects(['events', 'news'])
+    except AttributeError:
+      pass
