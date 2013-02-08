@@ -99,7 +99,7 @@ class DMSiteImportView(BrowserView):
     if url in self.skip_list:
       return False
     # If the URL ends with any of these strings, don't crawl it.
-    skip_suffixes = ['file_view', 'folder_contents']
+    skip_suffixes = ['file_view']
     for s in skip_suffixes:
       if url[len(s) * -1:] == s:
 	return False
