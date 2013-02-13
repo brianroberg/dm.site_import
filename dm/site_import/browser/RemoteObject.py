@@ -27,7 +27,10 @@ class RemoteResource:
     r = self.conn.getresponse()
     # TODO: add base_url to error message
     if r.status == 404:
-      msg = "Server at %s returned 404 for resource %s" % (self.site, self)
+      try:
+	msg = "Server at %s returned 404 for resource %s" % (self.site, self)
+      except AttributeError:
+        msg = "Server returned error status %s" % r.status
       raise NotFoundError, msg
     elif r.status >= 300:
       try:
@@ -62,6 +65,7 @@ class RemoteLinkTarget(RemoteResource):
 
     request_url = "%s/absolute_url" % full_url
 
+    # TODO: Factor this out to unify it with the make_http_request version.
     # Check whether we've already looked up this absolute url.
     if request_url not in RemoteResource.http_requests:
       self.conn = httplib.HTTPConnection(site)
@@ -90,8 +94,12 @@ class RemoteObject(RemoteResource):
     # Retrieve the title and id (which we'll call "shortname")
     title_and_id = self.make_http_request('title_and_id')
     match = re.match('(.*)(\s+)\((.*)\)', title_and_id)
-    self.title = match.group(1).strip()
-    self.shortname = match.group(3).strip()
+    if match:
+      self.title = match.group(1).strip()
+      self.shortname = match.group(3).strip()
+    else:
+      print "No regexp match with title_and_id = '%s'" % title_and_id
+      self.shortname = self.title = title_and_id
     
     self.obj_type = self.make_http_request('Type')
 
@@ -117,9 +125,14 @@ class RemoteObject(RemoteResource):
   def get_folder_body(self):
     return self.make_http_request('folder_contents')
 
+  def get_images(self):
+    return [image for image in self.soup.find_all('img')]
+
   def get_link_targets(self):
     """Return a list of URLs linked to in the remote object."""
-    return [link.get('href') for link in self.get_links()]
+    targets = [link.get('href') for link in self.get_links()]
+    targets.extend([image.get('src') for image in self.get_images()])
+    return targets
 
   def get_links(self):
     try:
