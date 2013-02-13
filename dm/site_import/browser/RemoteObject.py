@@ -107,6 +107,7 @@ class RemoteObject(RemoteResource):
       self.soup = BeautifulSoup(self.get_cooked_body())
     elif self.obj_type in ['Folder', 'Large Folder']:
       self.soup = BeautifulSoup(self.get_folder_body())
+      self.default_page = self.make_http_request('getDefaultPage')
     elif self.obj_type == 'Image':
       self.image = self.make_http_request('image')
     elif self.obj_type == 'File':
@@ -153,4 +154,4 @@ class RemoteObject(RemoteResource):
       return response
     else:
       return RemoteResource.http_requests[request_url]
-      
+
