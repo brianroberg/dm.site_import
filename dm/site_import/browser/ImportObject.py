@@ -55,6 +55,8 @@ class ImportFolder(ImportObject):
     except ObjectAlreadyExistsError:
       print "%s already exists, exiting create()" % self.remote_obj.shortname
     else:
+      if self.remote_obj.default_page:
+	self.site_obj.setDefaultPage(self.remote_obj.default_page)
       self.site_obj.reindexObject()
 
 
