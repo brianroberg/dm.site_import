@@ -102,6 +102,12 @@ class RemoteObject(RemoteResource):
       self.shortname = self.title = title_and_id
     
     self.obj_type = self.make_http_request('Type')
+    # Sometimes calling /Type on images returns "Plone Site," so
+    # if that's what came back, double-check.
+    if self.obj_type == 'Plone Site':
+      img_types = ['image/jpeg', 'image/png', 'image/gif']
+      if self.make_http_request('getContentType') in img_types:
+        self.obj_type = 'Image'
 
     if self.obj_type in ['News Item', 'Page']:
       self.soup = BeautifulSoup(self.get_cooked_body())
