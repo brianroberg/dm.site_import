@@ -88,6 +88,10 @@ class RemoteObject(RemoteResource):
     self.absolute_url = absolute_url
     if not self.is_valid_url(self.absolute_url):
       raise ValueError, "Invalid URL %s" % self.absolute_url[:256]
+
+    # Check for certain Plone-specific suffixes which we should ignore.
+    self.absolute_url = self.get_image_url(self.absolute_url)
+
     relative_url_str = self.make_http_request('virtual_url_path')
     self.relative_url = relative_url_str.split('/')
 
@@ -108,13 +112,14 @@ class RemoteObject(RemoteResource):
       img_types = ['image/jpeg', 'image/png', 'image/gif']
       if self.make_http_request('getContentType') in img_types:
         self.obj_type = 'Image'
-
+        #self.absolute_url = self.get_image_url(self.absolute_url)
     if self.obj_type in ['News Item', 'Page']:
       self.soup = BeautifulSoup(self.get_cooked_body())
     elif self.obj_type in ['Folder', 'Large Folder']:
       self.soup = BeautifulSoup(self.get_folder_body())
       self.default_page = self.make_http_request('getDefaultPage')
     elif self.obj_type == 'Image':
+      #self.absolute_url = self.get_image_url(self.absolute_url)
       self.image = self.make_http_request('image')
     elif self.obj_type == 'File':
       self.file_data = self.make_http_request('getFile')
@@ -131,6 +136,24 @@ class RemoteObject(RemoteResource):
 
   def get_folder_body(self):
     return self.make_http_request('folder_contents')
+
+  def get_image_url(self, url):
+    """Return URL with any Plone-specific suffixes removed."""
+    suffixes = ['/image_large', '/image_preview', '/image_mini',
+                '/image_thumb', '/image_tile', '/image_icon',
+                '/image_listing']
+    # First strip off a trailing slash if it's there.
+    if url[-1] == '/':
+      url = url[:-1]
+
+    for s in suffixes:
+      if url[len(s) * -1:] == s:
+
+        return url[:len(s) * -1]
+
+    # If we make it down here, return the URL as-is.
+    return url
+        
 
   def get_images(self):
     return [image for image in self.soup.find_all('img')]

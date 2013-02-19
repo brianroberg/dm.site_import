@@ -12,7 +12,6 @@ class ImportObject(object):
   def create(self):
     print "Running create() for %s %s" % (self.type_name,
                                           self.absolute_url)
-    #import pdb; pdb.set_trace()
     if len(self.relative_url) > 1:
       relative_url_str = '/'.join(self.relative_url[:-1])
       container = self.view_obj.context.unrestrictedTraverse(relative_url_str)

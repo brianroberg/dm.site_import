@@ -15,15 +15,21 @@ class DMSiteImportView(BrowserView):
     # original site).
     self.objects_seen = {}
 
+    site = 'www.dm.org'
+    #site = 'gettysburg.dm.org'
+
     # TODO: There are some URLs we shouldn't try to retrieve because
     # they don't exist in Zope, e.g. dm.org/donate. I could hard-code
     # those URLs here.
-    self.skip_list = ['http://www.dm.org/donate']
+    self.skip_list = ['http://www.dm.org/donate', 
+                      "http://%s/login_form" % site,
+                      "http://%s/sitemap" % site,
+                      "http://%s/search_form" % site]
 
     self.remove_events_and_news()
 
-    site = 'www.dm.org'
     hp = RemoteObject('http://www.dm.org/site-homepage')
+    #hp = RemoteObject('http://gettysburg.dm.org/site-homepage')
     self.objects_seen[hp.absolute_url] = ImportPage(hp, self)
     self.objects_seen[hp.absolute_url].create()
     self.crawl(hp)
@@ -32,8 +38,6 @@ class DMSiteImportView(BrowserView):
 
   def add(self, remote_obj):
     """Add a remote object to the local site."""
-
-    #import pdb; pdb.set_trace()
 
     # Check whether the object's parent has already been added.
     # If not, we need to add it first.
