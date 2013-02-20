@@ -31,45 +31,45 @@ class RemoteObjectTesting(unittest.TestCase):
       remote_obj = RemoteObject('http://www.dm.org/site-homepage')
       self.assertEqual(remote_obj.absolute_url, 'http://www.dm.org/site-homepage')
 
-    def test_get_image_url_large(self):
+    def test_strip_plone_suffix_large(self):
       remote_obj = RemoteObject('http://www.dm.org/site-homepage')
-      self.assertEqual(remote_obj.get_image_url('http://www.dm.org/foo.jpg/image_large'), 'http://www.dm.org/foo.jpg')
+      self.assertEqual(remote_obj.strip_plone_suffix('http://www.dm.org/foo.jpg/image_large'), 'http://www.dm.org/foo.jpg')
 
-    def test_get_image_url_preview(self):
+    def test_strip_plone_suffix_preview(self):
       remote_obj = RemoteObject('http://www.dm.org/site-homepage')
-      self.assertEqual(remote_obj.get_image_url('http://www.dm.org/foo.jpg/image_preview'), 'http://www.dm.org/foo.jpg')
+      self.assertEqual(remote_obj.strip_plone_suffix('http://www.dm.org/foo.jpg/image_preview'), 'http://www.dm.org/foo.jpg')
 
-    def test_get_image_url_mini(self):
+    def test_strip_plone_suffix_mini(self):
       remote_obj = RemoteObject('http://www.dm.org/site-homepage')
-      self.assertEqual(remote_obj.get_image_url('http://www.dm.org/foo.jpg/image_mini'), 'http://www.dm.org/foo.jpg')
+      self.assertEqual(remote_obj.strip_plone_suffix('http://www.dm.org/foo.jpg/image_mini'), 'http://www.dm.org/foo.jpg')
 
-    def test_get_image_url_thumb(self):
+    def test_strip_plone_suffix_thumb(self):
       remote_obj = RemoteObject('http://www.dm.org/site-homepage')
-      self.assertEqual(remote_obj.get_image_url('http://www.dm.org/foo.jpg/image_thumb'), 'http://www.dm.org/foo.jpg')
+      self.assertEqual(remote_obj.strip_plone_suffix('http://www.dm.org/foo.jpg/image_thumb'), 'http://www.dm.org/foo.jpg')
 
-    def test_get_image_url_tile(self):
+    def test_strip_plone_suffix_tile(self):
       remote_obj = RemoteObject('http://www.dm.org/site-homepage')
-      self.assertEqual(remote_obj.get_image_url('http://www.dm.org/foo.jpg/image_tile'), 'http://www.dm.org/foo.jpg')
+      self.assertEqual(remote_obj.strip_plone_suffix('http://www.dm.org/foo.jpg/image_tile'), 'http://www.dm.org/foo.jpg')
 
-    def test_get_image_url_icon(self):
+    def test_strip_plone_suffix_icon(self):
       remote_obj = RemoteObject('http://www.dm.org/site-homepage')
-      self.assertEqual(remote_obj.get_image_url('http://www.dm.org/foo.jpg/image_icon'), 'http://www.dm.org/foo.jpg')
+      self.assertEqual(remote_obj.strip_plone_suffix('http://www.dm.org/foo.jpg/image_icon'), 'http://www.dm.org/foo.jpg')
 
-    def test_get_image_url_listing(self):
+    def test_strip_plone_suffix_listing(self):
       remote_obj = RemoteObject('http://www.dm.org/site-homepage')
-      self.assertEqual(remote_obj.get_image_url('http://www.dm.org/foo.jpg/image_listing'), 'http://www.dm.org/foo.jpg')
+      self.assertEqual(remote_obj.strip_plone_suffix('http://www.dm.org/foo.jpg/image_listing'), 'http://www.dm.org/foo.jpg')
 
-    def test_get_image_url_trailing_slash(self):
+    def test_strip_plone_suffix_trailing_slash(self):
       remote_obj = RemoteObject('http://www.dm.org/site-homepage')
-      self.assertEqual(remote_obj.get_image_url('http://www.dm.org/foo.jpg/'), 'http://www.dm.org/foo.jpg')
+      self.assertEqual(remote_obj.strip_plone_suffix('http://www.dm.org/foo.jpg/'), 'http://www.dm.org/foo.jpg')
 
-    def test_get_image_url_no_change(self):
+    def test_strip_plone_suffix_no_change(self):
       remote_obj = RemoteObject('http://www.dm.org/site-homepage')
-      self.assertEqual(remote_obj.get_image_url('http://www.dm.org/foo.jpg'), 'http://www.dm.org/foo.jpg')
+      self.assertEqual(remote_obj.strip_plone_suffix('http://www.dm.org/foo.jpg'), 'http://www.dm.org/foo.jpg')
 
-
-     
-      
+    def test_strip_plone_suffix_view(self):
+      remote_obj = RemoteObject('http://www.dm.org/site-homepage')
+      self.assertEqual(remote_obj.strip_plone_suffix('http://www.dm.org/foo.jpg/view'), 'http://www.dm.org/foo.jpg')
 
     def test_is_valid_url(self):
       remote_obj = RemoteObject('http://www.dm.org/site-homepage')
