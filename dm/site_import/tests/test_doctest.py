@@ -7,7 +7,6 @@ import doctest
 from Testing import ZopeTestCase as ztc
 
 from dm.site_import.tests import base
-from dm.site_import.browser.Crawler import Crawler
 from dm.site_import.browser.ImportObject import (ImportObject, ImportFile,
                                                  ImportFolder, ImportImage,
                                                  ImportPage)
@@ -19,32 +18,12 @@ from dm.site_import.browser.RemoteObject import (HTTPError, NotFoundError,
 def test_suite():
       suite = unittest.TestSuite()
       suite.addTests([
-          unittest.makeSuite(CrawlerTesting),
           unittest.makeSuite(RemoteObjectTesting)
       ])
       return suite
 
 if __name__ == '__main__':
     unittest.main(defaultTest='test_suite')
-
-class CrawlerTesting(unittest.TestCase):
-    
-    def test_get_relative_url_str_simple(self):
-      crawler = Crawler('www.dm.org')
-      absolute_url = 'http://www.dm.org/foobar'
-      self.assertEqual(crawler.get_relative_url_str(absolute_url),
-                       'foobar')
-
-    def test_get_relative_url_str_subdir(self):
-      crawler = Crawler('www.dm.org')
-      absolute_url = 'http://www.dm.org/foo/bar'
-      self.assertEqual(crawler.get_relative_url_str(absolute_url),
-                       'foo/bar')
-      
-
-    def test_get_site(self):
-      crawler = Crawler('www.dm.org')
-      self.assertEqual(crawler.get_site(), 'www.dm.org')
 
 class RemoteObjectTesting(unittest.TestCase):
 
