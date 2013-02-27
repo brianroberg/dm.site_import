@@ -15,7 +15,6 @@ class ImportObject(object):
     if len(self.relative_url) > 1:
       relative_url_str = '/'.join(self.relative_url[:-1])
       container = self.view_obj.context.unrestrictedTraverse(relative_url_str)
-      # TODO: Fix the AttributeError that comes up here
     else:
       container = self.view_obj.context
     if self.remote_obj.shortname in container.objectIds():
