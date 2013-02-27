@@ -1,4 +1,3 @@
-import urllib
 from ImportObject import (ImportObject, ImportFile, ImportFolder, 
                           ImportImage, ImportPage)
 from RemoteObject import (HTTPError, NotFoundError, RemoteLinkTarget,
@@ -10,12 +9,7 @@ class Crawler(object):
     self.view_obj = view_obj
     self.site = site
 
-    # Dictionary to keep track of what objects we've already seen.
-    # Each value is an Import Object.
-    # Each key is the object's absolute_url (as returned in the
-    # original site).
-    self.objects_seen = {}
-
+  def go(self):
     # There are some URLs we shouldn't try to retrieve because
     # they don't exist in Zope, or because they're Plone internal URLs
     # rather than content.
@@ -24,11 +18,15 @@ class Crawler(object):
                       "http://%s/sitemap" % self.site,
                       "http://%s/search_form" % self.site]
 
-  def go(self):
-
     self.remove_events_and_news()
 
     hp = RemoteObject("http://%s/site-homepage" % self.site)
+
+    # Dictionary to keep track of what objects we've already seen.
+    # Each value is an Import Object.
+    # Each key is the object's absolute_url (as returned in the
+    # original site).
+    self.objects_seen = {}
     self.objects_seen[hp.absolute_url] = ImportPage(hp, self.view_obj)
     self.objects_seen[hp.absolute_url].create()
     self.crawl(hp)
@@ -47,26 +45,22 @@ class Crawler(object):
     if remote_obj.obj_type == 'Page':
       ip = ImportPage(remote_obj, self.view_obj)
       self.objects_seen[remote_obj.absolute_url] = ip
-      if self.needs_created(remote_obj.get_relative_url_str()):
-	ip.create()            
+      ip.create()            
       self.crawl(remote_obj)
     elif remote_obj.obj_type == 'Folder':
       import_obj = ImportFolder(remote_obj, self.view_obj)
       self.objects_seen[remote_obj.absolute_url] = import_obj
-      if self.needs_created(remote_obj.get_relative_url_str()):
-	import_obj.create()            
+      import_obj.create()            
       self.crawl(remote_obj)
     elif remote_obj.obj_type == 'Image':
       import_obj = ImportImage(remote_obj, self.view_obj)
       self.objects_seen[remote_obj.absolute_url] = import_obj
-      if self.needs_created(remote_obj.get_relative_url_str()):
-	import_obj.create()            
+      import_obj.create()            
       # Nothing to crawl within an image
     elif remote_obj.obj_type == 'File':
       import_obj = ImportFile(remote_obj, self.view_obj)
       self.objects_seen[remote_obj.absolute_url] = import_obj
-      if self.needs_created(remote_obj.get_relative_url_str()):
-	import_obj.create()            
+      import_obj.create()            
       # Nothing to crawl within a file
     else:
       print "%s appears to be a %s, no handler yet" % (remote_obj.absolute_url, remote_obj.obj_type)
@@ -74,14 +68,11 @@ class Crawler(object):
 
   def already_exists(self, url):
     """Returns true if the URL identifies an already-existing object."""
-    url = urllib.unquote(url)
-    try:
-      obj = self.view_obj.context.unrestrictedTraverse(url)
-    except (AttributeError, KeyError):
-      return False
-    return True
+    #import pdb; pdb.set_trace()
+    return False
 
   def crawl(self, remote_obj):
+    print "Running **crawl** on %s" % remote_obj.absolute_url
     targets = remote_obj.get_link_targets()
     # We will crawl not only this object, but also:
     #    1. Any objects above it in the containment hierarchy
@@ -110,16 +101,14 @@ class Crawler(object):
         except HTTPError:
           continue
 
+  def get_relative_url_str(self, absolute_url):                                 
+    """Return the relative URL string given the absolute URL."""
+    url = absolute_url[len("http://%s" % self.get_site()) + 1:]
+    return url
 
   def get_site(self):
     return self.site
 
-  def needs_created(self, url):
-    # Don't create if the object already exists in the new site 
-    # (from a previous run of the script).
-    if self.already_exists(url):
-      return False 
-    return True
 
   def needs_crawled(self, url):
     # TODO: Check to see if the object already exists in the new
@@ -129,10 +118,7 @@ class Crawler(object):
     # Don't crawl if we've already seen the object in this run
     # of the script.
     if url in self.objects_seen:
-      print "objects seen HIT: %s" % url
       return False
-    else:
-      print "objects seen MISS: %s" % url
 
     # Don't crawl if the URL is on a list of URLs to skip.
     if url in self.skip_list:
@@ -144,6 +130,10 @@ class Crawler(object):
       if url[len(s) * -1:] == s:
 	return False
 
+    # Don't crawl if the object already exists in the new site 
+    # (from a previous run of the script).
+    if self.already_exists(url):
+      return False 
 
     return True
 
