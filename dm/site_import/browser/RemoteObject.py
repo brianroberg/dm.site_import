@@ -1,7 +1,6 @@
 from bs4 import BeautifulSoup
 import httplib
 import re
-import urllib
 import urlparse
 
 class HTTPError(Exception):
@@ -89,7 +88,6 @@ class RemoteLinkTarget(RemoteResource):
 
     request_url = "%s/absolute_url" % full_url
 
-
     # TODO: Factor this out to unify it with the make_http_request version.
     # Check whether we've already looked up this absolute url.
     if request_url not in RemoteResource.http_requests:
@@ -121,8 +119,15 @@ class RemoteObject(RemoteResource):
     self.relative_url = relative_url_str.split('/')
 
     # Retrieve the title and id (which we'll call "shortname")
-    self.title = self.make_http_request('Title')
-    self.shortname = urllib.unquote(self.relative_url[-1])
+    title_and_id = self.make_http_request('title_and_id')
+    match = re.match('(.*)(\s+)\((.*)\)', title_and_id)
+    if match:
+      self.title = match.group(1).strip()
+      self.shortname = match.group(3).strip()
+    else:
+      print "No regexp match with title_and_id = '%s'" % title_and_id
+      self.shortname = self.title = title_and_id
+    
     self.obj_type = self.make_http_request('Type')
     # Sometimes calling /Type on images returns "Plone Site," so
     # if that's what came back, double-check.
@@ -170,12 +175,6 @@ class RemoteObject(RemoteResource):
     except AttributeError, msg:
       print "obj_type = %s" % self.obj_type
       raise AttributeError, msg
-
-  def get_relative_url_str(self):
-    if len(self.relative_url) > 1:
-      return '/'.join(self.relative_url[:-1])
-    else:
-      return self.relative_url[0]
 
   def get_site(self):
     return urlparse.urlparse(self.absolute_url).netloc
