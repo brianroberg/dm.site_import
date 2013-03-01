@@ -29,7 +29,7 @@ class Crawler(object):
                       "http://%s/search_form" % site]
 
     start_page = RemoteObject(starting_url)
-    self.objects_seen[start_page.absolute_url] = ImportPage(start_page, self)
+    self.objects_seen[start_page.absolute_url] = start_page
     self.crawl(start_page)
 
     return self.objects_seen
