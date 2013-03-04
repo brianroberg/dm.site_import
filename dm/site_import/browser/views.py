@@ -4,11 +4,14 @@ from ImportObject import (ImportObject, ImportFile, ImportFolder,
                           ImportImage, ImportPage)
 from RemoteObject import (HTTPError, NotFoundError, RemoteLinkTarget,
                           RemoteObject)
+import config
 
 class DMSiteImportView(BrowserView):
 
   def __call__(self):
     self.remove_events_and_news()
+
+    return "username = %s, password = %s" % (config.username, config.password)
 
     starting_url = 'http://gettysburg.dm.org/site-homepage'
 
