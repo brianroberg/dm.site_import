@@ -7,6 +7,9 @@ import urlparse
 class HTTPError(Exception):
   pass
 
+class AuthRequiredError(HTTPError):
+  pass
+
 class NotFoundError(HTTPError):
   pass
 
@@ -26,19 +29,23 @@ class RemoteResource:
 
   def get_http_response(self):
     r = self.conn.getresponse()
-    # TODO: add base_url to error message
     if r.status == 404:
-      try:
-	msg = "Server at %s returned 404 for resource %s" % (self.site, self)
-      except AttributeError:
-        msg = "Server returned error status %s" % r.status
+      msg = "Server returned error status %s" % r.status
       raise NotFoundError, msg
     elif r.status >= 300:
-      try:
-	msg = "Server at %s returned error status %s for resource %s" % (self.site, r.status, self)
-      except AttributeError:
-        msg = "Server returned error status %s" % r.status
-      raise HTTPError, msg
+      if r.status == 302:
+        redirect_target = r.getheader('location')
+
+        # If the site has redirected us to the login page, throw an
+        # AuthRequiredError.
+        if 'require_login' in redirect_target:
+          orig_url = redirect_target[redirect_target.rfind('http'):]
+          msg = "Login required to access %s" % orig_url
+          raise AuthRequiredError, msg
+
+      else:
+	msg = "Server returned error status %s" % r.status
+	raise HTTPError, msg
     return r.read()
 
 
@@ -125,10 +132,10 @@ class RemoteObject(RemoteResource):
     self.obj_type = self.make_http_request('Type')
     # Sometimes calling /Type on images returns "Plone Site," so
     # if that's what came back, double-check.
-    if self.obj_type == 'Plone Site':
-      img_types = ['image/jpeg', 'image/png', 'image/gif']
-      if self.make_http_request('getContentType') in img_types:
-        self.obj_type = 'Image'
+    #if self.obj_type == 'Plone Site':
+    #  img_types = ['image/jpeg', 'image/png', 'image/gif']
+    #  if self.make_http_request('getContentType') in img_types:
+    #    self.obj_type = 'Image'
     if self.obj_type in ['News Item', 'Page']:
       self.soup = BeautifulSoup(self.get_cooked_body())
     elif self.obj_type in ['Folder', 'Large Folder']:
@@ -176,6 +183,7 @@ class RemoteObject(RemoteResource):
   def make_http_request(self, suffix=""):
     request_url = "%s/%s" % (self.absolute_url, suffix)
     if request_url not in RemoteResource.http_requests:
+      print "request_url = %s" % request_url
       self.conn.request('GET', request_url)
       response = self.get_http_response()
       RemoteResource.http_requests[request_url] = response
