@@ -1,8 +1,10 @@
 from bs4 import BeautifulSoup
 import httplib
 import re
+import requests
 import urllib
 import urlparse
+
 
 class HTTPError(Exception):
   pass
@@ -41,11 +43,12 @@ class RemoteResource:
         if 'require_login' in redirect_target:
           orig_url = redirect_target[redirect_target.rfind('http'):]
           msg = "Login required to access %s" % orig_url
-          raise AuthRequiredError, msg
+      
+          #raise AuthRequiredError, msg
 
       else:
-	msg = "Server returned error status %s" % r.status
-	raise HTTPError, msg
+        msg = "Server returned error status %s" % r.status
+        raise HTTPError, msg
     return r.read()
 
 
@@ -180,14 +183,42 @@ class RemoteObject(RemoteResource):
   def get_site(self):
     return urlparse.urlparse(self.absolute_url).netloc
 
-  def make_http_request(self, suffix=""):
+  def make_http_request(self, suffix="", method="GET"):
+    # Validate the method.  GET and POST currently supported.
+    if method.upper() not in ['GET', 'POST']:
+      raise ValueError, 'Unsupported method "%s"' % method
+
     request_url = "%s/%s" % (self.absolute_url, suffix)
+
+    # Check whether we've already made this request. If so, use the
+    # result we got last time instead of making it again.
     if request_url not in RemoteResource.http_requests:
       print "request_url = %s" % request_url
-      self.conn.request('GET', request_url)
-      response = self.get_http_response()
-      RemoteResource.http_requests[request_url] = response
-      return response
+      #self.conn.request(method, request_url)
+      #response = self.get_http_response()
+
+      r = requests.request(method, request_url)
+      if r.status_code == 404:
+        msg = "Server returned error status %s" % r.status_code
+        raise NotFoundError, msg
+      elif r.status_code >= 300:
+        if r.status_code == 302:
+          redirect_target = r.headers('location')
+
+          # If the site has redirected us to the login page, throw an
+          # AuthRequiredError.
+          if 'require_login' in redirect_target:
+            orig_url = redirect_target[redirect_target.rfind('http'):]
+            msg = "Login required to access %s" % orig_url
+        
+            #raise AuthRequiredError, msg
+
+        else:
+          msg = "Server returned error status %s" % r.status_code
+          raise HTTPError, msg
+
+      RemoteResource.http_requests[request_url] = r.content
+      return r.content
     else:
       return RemoteResource.http_requests[request_url]
 

@@ -57,6 +57,7 @@ setup(name='dm.site_import',
       install_requires=['setuptools',
                         # -*- Extra requirements: -*-
                         'Plone',
+                        'requests',
                         ],
       tests_require=tests_require,
       extras_require=dict(tests=tests_require),
