@@ -1,4 +1,5 @@
 from bs4 import BeautifulSoup
+import config
 import httplib
 import re
 import requests
@@ -29,27 +30,56 @@ class RemoteResource:
     else:
       return "unknown RemoteResource object"
 
-  def get_http_response(self):
-    r = self.conn.getresponse()
-    if r.status == 404:
-      msg = "Server returned error status %s" % r.status
-      raise NotFoundError, msg
-    elif r.status >= 300:
-      if r.status == 302:
-        redirect_target = r.getheader('location')
+  def get_site(self):
+    return urlparse.urlparse(self.absolute_url).netloc
 
-        # If the site has redirected us to the login page, throw an
-        # AuthRequiredError.
-        if 'require_login' in redirect_target:
-          orig_url = redirect_target[redirect_target.rfind('http'):]
-          msg = "Login required to access %s" % orig_url
-      
-          #raise AuthRequiredError, msg
+  def make_http_request(self, suffix="", method="GET", full_url = ''):
+    # Validate the method.  GET and POST currently supported.
+    if method.upper() not in ['GET', 'POST']:
+      raise ValueError, 'Unsupported method "%s"' % method
 
-      else:
-        msg = "Server returned error status %s" % r.status
-        raise HTTPError, msg
-    return r.read()
+    if full_url:
+      request_url = "%s/%s" % (full_url, suffix)
+    else:
+      request_url = "%s/%s" % (self.absolute_url, suffix)
+
+    # Check whether we've already made this request. If so, use the
+    # result we got last time instead of making it again.
+    if request_url not in RemoteResource.http_requests:
+      r = self.session.request(method, request_url, verify=False)
+
+      # If the site has redirected us to the login page, log in
+      # using credentials stored in the config module.
+      if 'require_login' in r.url:
+        orig_url = r.history[0].url
+        # TODO: Determine if all of these parameters are necessary.
+        payload = {'__ac_name': config.username,
+                   '__ac_password': config.password,
+                   'came_from': '',
+                   'cookies_enabled': '',
+                   'form.submitted': 1,
+                   'js_enabled': 0,
+                   'login_name': '',
+                   'pwd_empty': 0,
+                   'submit': 'Log in'}
+        auth_url = "https://%s/login_form" % self.get_site()
+        auth_r = self.session.post(auth_url, payload, verify=False)
+        r = self.session.request(method, request_url, verify=False)
+      if r.status_code == 404:
+        msg = "Server returned error status %s" % r.status_code
+        raise NotFoundError, msg
+      elif r.status_code >= 300:
+        if r.status_code == 302:
+          redirect_target = r.headers('location')
+
+        else:
+          msg = "Server returned error status %s" % r.status_code
+          raise HTTPError, msg
+
+      RemoteResource.http_requests[request_url] = r.content
+      return r.content
+    else:
+      return RemoteResource.http_requests[request_url]
 
 
   def strip_plone_suffix(self, url):
@@ -82,10 +112,14 @@ class RemoteResource:
 class RemoteLinkTarget(RemoteResource):
   """Represents a link we've found on the remote site."""
 
-  def __init__(self, site, base_url, link):
+  def __init__(self, site, base_url, link, session = None):
     self.site = site
     self.link = link
     full_url = urlparse.urljoin(base_url, link, allow_fragments=False)
+    if session:
+      self.session = session
+    else:
+      self.session = requests.Session()
 
     # Filter the URL we've constructed to remove any Plone-specific
     # suffixes.
@@ -97,17 +131,11 @@ class RemoteLinkTarget(RemoteResource):
       msg = "Resource %s not part of site %s" % (link, site)
       raise OffsiteError, msg
 
-    request_url = "%s/absolute_url" % full_url
-
-    # TODO: Factor this out to unify it with the make_http_request version.
-    # Check whether we've already looked up this absolute url.
-    if request_url not in RemoteResource.http_requests:
-      self.conn = httplib.HTTPConnection(site)
-      self.conn.request('GET', request_url)
-      self.absolute_url = self.get_http_response()
-      RemoteResource.http_requests[request_url] = self.absolute_url
-    else:
-      self.absolute_url = RemoteResource.http_requests[request_url]
+    #self.absolute_url = self.make_http_request('absolute_url',
+    #                                           full_url = full_url)
+    # I may be overlooking ramifications of this change, so I'm
+    # leaving the old code here for the moment.
+    self.absolute_url = full_url
 
     if not self.is_valid_url(self.absolute_url):
       raise ValueError, "Invalid URL %s" % self.absolute_url
@@ -116,10 +144,13 @@ class RemoteLinkTarget(RemoteResource):
 class RemoteObject(RemoteResource):
   """A piece of content retrieved from the remote site."""
 
-  def __init__(self, absolute_url):
-    site = urlparse.urlparse(absolute_url).netloc
-    self.conn = httplib.HTTPConnection(site)
+  def __init__(self, absolute_url, session = None):
     self.absolute_url = absolute_url
+    if session:
+      self.session = session
+    else:
+      self.session = requests.Session()
+
     if not self.is_valid_url(self.absolute_url):
       raise ValueError, "Invalid URL %s" % self.absolute_url[:256]
 
@@ -180,45 +211,4 @@ class RemoteObject(RemoteResource):
       print "obj_type = %s" % self.obj_type
       raise AttributeError, msg
 
-  def get_site(self):
-    return urlparse.urlparse(self.absolute_url).netloc
-
-  def make_http_request(self, suffix="", method="GET"):
-    # Validate the method.  GET and POST currently supported.
-    if method.upper() not in ['GET', 'POST']:
-      raise ValueError, 'Unsupported method "%s"' % method
-
-    request_url = "%s/%s" % (self.absolute_url, suffix)
-
-    # Check whether we've already made this request. If so, use the
-    # result we got last time instead of making it again.
-    if request_url not in RemoteResource.http_requests:
-      print "request_url = %s" % request_url
-      #self.conn.request(method, request_url)
-      #response = self.get_http_response()
-
-      r = requests.request(method, request_url)
-      if r.status_code == 404:
-        msg = "Server returned error status %s" % r.status_code
-        raise NotFoundError, msg
-      elif r.status_code >= 300:
-        if r.status_code == 302:
-          redirect_target = r.headers('location')
-
-          # If the site has redirected us to the login page, throw an
-          # AuthRequiredError.
-          if 'require_login' in redirect_target:
-            orig_url = redirect_target[redirect_target.rfind('http'):]
-            msg = "Login required to access %s" % orig_url
-        
-            #raise AuthRequiredError, msg
-
-        else:
-          msg = "Server returned error status %s" % r.status_code
-          raise HTTPError, msg
-
-      RemoteResource.http_requests[request_url] = r.content
-      return r.content
-    else:
-      return RemoteResource.http_requests[request_url]
 
