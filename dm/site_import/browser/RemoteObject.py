@@ -13,6 +13,9 @@ class HTTPError(Exception):
 class AuthRequiredError(HTTPError):
   pass
 
+class BadRequestError(HTTPError):
+  pass
+
 class NotFoundError(HTTPError):
   pass
 
@@ -68,13 +71,13 @@ class RemoteResource:
       if r.status_code == 404:
         msg = "Server returned error status %s" % r.status_code
         raise NotFoundError, msg
+      elif r.status_code == 400:
+        msg = "Server returned error status %s" % r.status_code
+        raise BadRequestError, msg
       elif r.status_code >= 300:
-        if r.status_code == 302:
-          redirect_target = r.headers('location')
-
-        else:
-          msg = "Server returned error status %s" % r.status_code
-          raise HTTPError, msg
+        msg = "Server returned error status %s" % r.status_code
+        import pdb; pdb.set_trace()
+        raise HTTPError, msg
 
       RemoteResource.http_requests[request_url] = r.content
       return r.content
@@ -84,9 +87,10 @@ class RemoteResource:
 
   def strip_plone_suffix(self, url):
     """Return URL with any Plone-specific suffixes removed."""
-    suffixes = ['/image_large', '/image_preview', '/image_mini',
-                '/image_thumb', '/image_tile', '/image_icon',
-                '/image_listing', '/view']
+    suffixes = ['/document_view', '/folder_contents', '/image_large',
+                '/image_preview',
+                '/image_mini', '/image_thumb', '/image_tile',
+                '/image_icon', '/image_listing', '/view']
     # First strip off a trailing slash if it's there.
     if url[-1] == '/':
       url = url[:-1]
@@ -131,11 +135,8 @@ class RemoteLinkTarget(RemoteResource):
       msg = "Resource %s not part of site %s" % (link, site)
       raise OffsiteError, msg
 
-    #self.absolute_url = self.make_http_request('absolute_url',
-    #                                           full_url = full_url)
-    # I may be overlooking ramifications of this change, so I'm
-    # leaving the old code here for the moment.
-    self.absolute_url = full_url
+    self.absolute_url = self.make_http_request('absolute_url',
+                                               full_url = full_url)
 
     if not self.is_valid_url(self.absolute_url):
       raise ValueError, "Invalid URL %s" % self.absolute_url
@@ -144,12 +145,14 @@ class RemoteLinkTarget(RemoteResource):
 class RemoteObject(RemoteResource):
   """A piece of content retrieved from the remote site."""
 
-  def __init__(self, absolute_url, session = None):
-    self.absolute_url = absolute_url
+  def __init__(self, url, session = None):
     if session:
       self.session = session
     else:
       self.session = requests.Session()
+
+    self.absolute_url = self.make_http_request('absolute_url',
+                                               full_url = url)
 
     if not self.is_valid_url(self.absolute_url):
       raise ValueError, "Invalid URL %s" % self.absolute_url[:256]
