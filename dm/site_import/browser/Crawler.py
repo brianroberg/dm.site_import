@@ -1,13 +1,13 @@
 from ImportObject import (ImportObject, ImportFile, ImportFolder, 
                           ImportImage, ImportPage)
-from RemoteObject import (HTTPError, NotFoundError, RemoteLinkTarget,
-                          RemoteObject)
+from RemoteObject import (BadRequestError, HTTPError, NotFoundError,
+                          RemoteLinkTarget, RemoteObject)
 import requests
 import urlparse
 
 class Crawler(object):
 
-  def __init__(self):
+  def __init__(self, starting_url):
     # Dictionary to keep track of what objects we've already seen.
     # Each value is an Import Object.
     # Each key is the object's absolute_url (as returned in the
@@ -18,8 +18,7 @@ class Crawler(object):
     # the RemoteLinkTargets and RemoteObjects we'll be creating.
     self.session = requests.Session()
 
-
-  def get_import_objects(self, starting_url):
+    self.starting_url = starting_url
 
     # Extract the site name from the starting URL.
     site = urlparse.urlparse(starting_url).netloc 
@@ -27,18 +26,24 @@ class Crawler(object):
     # TODO: There are some URLs we shouldn't try to retrieve because
     # they don't exist in Zope, e.g. dm.org/donate. I could hard-code
     # those URLs here.
-    self.skip_list = ['http://www.dm.org/donate', 
-                      "http://%s/login_form" % site,
-                      "http://%s/object_copy" % site,
-                      "http://%s/plone_memberprefs_panel" % site,
-                      "http://%s/sitemap" % site,
-                      "http://%s/search_form" % site]
+    self.skip_list = ['http://www.dm.org/donate']
 
-    start_page = RemoteObject(starting_url, session = self.session)
+  def get_import_objects(self):
+
+    start_page = RemoteObject(self.starting_url, session = self.session)
     self.objects_seen[start_page.absolute_url] = start_page
     self.crawl(start_page)
 
     return self.objects_seen
+
+  def contains_skip_string(self, url):
+    # There are some string patterns in URLs which tell us
+    # right away that we don't want to follow the link.
+    skip_strings = ['@@', '++resource++']
+    for s in skip_strings:
+      if s in url:
+        return True
+    return False
 
 
   def crawl(self, remote_obj):
@@ -51,6 +56,10 @@ class Crawler(object):
     for t in targets:
       if not t:
         continue
+      if self.contains_skip_string(t):
+        continue
+
+      
       try:
         rlt = RemoteLinkTarget(remote_obj.get_site(),
                                remote_obj.absolute_url, t,
@@ -72,6 +81,9 @@ class Crawler(object):
           self.queue(remote_obj)
         except NotFoundError:
           print "Error 404 following link to %s on %s" % (rlt.absolute_url, remote_obj.absolute_url)
+        except BadRequestError:
+          print "Error 400 following link to %s on %s" % (rlt.absolute_url, remote_obj.absolute_url)
+
 
 
   def queue(self, remote_obj):
@@ -82,7 +94,8 @@ class Crawler(object):
       self.queue(RemoteObject(parent_url, session = self.session))
 
     self.objects_seen[remote_obj.absolute_url] = remote_obj
-    print "*** %s *** %s added to objects_seen" % (len(self.objects_seen.keys()), remote_obj.absolute_url)
+    print "*** %s *** %s" % (len(self.objects_seen.keys()),
+                             remote_obj.absolute_url)
 
     # Pages and Folders should be crawled further.
     if remote_obj.obj_type in ['Page', 'Folder']:
@@ -95,10 +108,25 @@ class Crawler(object):
       return False
     if url in self.skip_list:
       return False
+    
     # If the URL ends with any of these strings, don't crawl it.
-    skip_suffixes = ['file_view']
+    skip_suffixes = ['author',
+                     'author/siteimport',
+                     '#documentContent',
+                     'file_view',
+                     'login_form',
+                     'logout',
+                     'object_copy',
+                     'plone_memberprefs_panel',
+                     '#portlet-navigation-tree',
+                     'search_form',
+                     'sitemap']
     for s in skip_suffixes:
       if url[len(s) * -1:] == s:
-	return False
+        return False
+
+
+    # If the URL has passed all the above tests, then give the
+    # thumbs-up to crawl.
     return True
 

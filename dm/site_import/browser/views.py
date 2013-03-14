@@ -11,10 +11,12 @@ class DMSiteImportView(BrowserView):
   def __call__(self):
     self.remove_events_and_news()
 
-    starting_url = 'https://staff.dm.org/index_html'
+    starting_url = 'http://gettysburg.dm.org/site-homepage'
+    #starting_url = 'https://staff.dm.org/index_html'
 
-    crawler = Crawler()
-    import_objects = crawler.get_import_objects(starting_url)
+
+    crawler = Crawler(starting_url)
+    import_objects = crawler.get_import_objects()
 
     urls = import_objects.keys()
     urls.sort()
