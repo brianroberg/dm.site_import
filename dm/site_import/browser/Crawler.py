@@ -39,7 +39,7 @@ class Crawler(object):
   def contains_skip_string(self, url):
     # There are some string patterns in URLs which tell us
     # right away that we don't want to follow the link.
-    skip_strings = ['@@', '++resource++']
+    skip_strings = ['@@', '++resource++', 'createObject?']
     for s in skip_strings:
       if s in url:
         return True
@@ -57,6 +57,8 @@ class Crawler(object):
       if not t:
         continue
       if self.contains_skip_string(t):
+        continue
+      if not self.needs_crawled(t):
         continue
 
       
@@ -103,24 +105,48 @@ class Crawler(object):
 
 
   def needs_crawled(self, url):
-    #import pdb; pdb.set_trace()
     if url in self.objects_seen:
       return False
     if url in self.skip_list:
       return False
     
     # If the URL ends with any of these strings, don't crawl it.
-    skip_suffixes = ['author',
+    skip_suffixes = ['atct_edit',
+                     'application.png',
+                     'audio.png',
+                     'author',
                      'author/siteimport',
+                     'contact-info',
+                     'content_status_history',
+                     'dashboard',
+                     'doc.png',
                      '#documentContent',
+                     'document_icon.gif',
+                     '/edit',
                      'file_view',
+                     'folder_constraintypes_form',
+                     'folder_factories',
+                     'folder_icon.gif',
+                     'image_icon.gif',
+                     'info_icon.gif',
                      'login_form',
+                     'logo.jpg',
                      'logout',
+                     'mail_password_form',
+                     'newsitem_icon.gif',
                      'object_copy',
+                     'ods.png',
+                     'odt.png',
+                     'pdf_icon.gif',
                      'plone_memberprefs_panel',
                      '#portlet-navigation-tree',
                      'search_form',
-                     'sitemap']
+                     'select_default_view',
+                     'sendto_form',
+                     'spinner.gif',
+                     'video.png',
+                     'xls.png',
+                     'zip.png']
     for s in skip_suffixes:
       if url[len(s) * -1:] == s:
         return False
