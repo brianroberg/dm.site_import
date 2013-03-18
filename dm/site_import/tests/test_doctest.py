@@ -60,10 +60,6 @@ class CrawlerTesting(unittest.TestCase):
     url = 'http://www.dm.org/search_form'
     self.assertFalse(crawler.needs_crawled(url))
 
-  def testNeedsCrawledSitemap(self):
-    crawler = Crawler('http://www.dm.org/site-homepage')
-    url = 'http://www.dm.org/sitemap'
-    self.assertFalse(crawler.needs_crawled(url))
 
 
 class RemoteObjectTesting(unittest.TestCase):
