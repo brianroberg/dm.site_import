@@ -33,43 +33,53 @@ class RemoteResource:
     else:
       return "unknown RemoteResource object"
 
+
   def get_site(self):
     return urlparse.urlparse(self.absolute_url).netloc
 
-  def make_http_request(self, suffix="", method="GET", full_url = ''):
+
+  def log_in(self, auth_url):
+    """Authenticates within the current HTTP session. Returns
+       nothing (works by side effect)."""
+    # TODO: Determine if all of these parameters are necessary.
+    payload = {'__ac_name': config.username,
+               '__ac_password': config.password,
+               'came_from': '',
+               'cookies_enabled': '',
+               'form.submitted': 1,
+               'js_enabled': 0,
+               'login_name': '',
+               'pwd_empty': 0,
+               'submit': 'Log in'}
+    auth_r = self.session.post(auth_url, payload, verify=False)
+    return None
+
+
+  def make_http_request(self, suffix="", method="GET"):
     # Validate the method.  GET and POST currently supported.
     if method.upper() not in ['GET', 'POST']:
       raise ValueError, 'Unsupported method "%s"' % method
 
-    if full_url:
-      request_url = "%s/%s" % (full_url, suffix)
-    else:
-      request_url = "%s/%s" % (self.absolute_url, suffix)
+    request_url = "%s/%s" % (self.absolute_url, suffix)
 
     # Check whether we've already made this request. If so, use the
     # result we got last time instead of making it again.
     if request_url not in RemoteResource.http_requests:
-      r = self.session.request(method, request_url, verify=False)
+      try:
+        r = self.session.request(method, request_url, verify=False)
+      except requests.TooManyRedirects:
+        print "TooManyRedirects raised while trying to access %s" % request_url
+        import pdb; pdb.set_trace()
 
       # If the site has redirected us to the login page, log in
-      # using credentials stored in the config module.
-      if 'require_login' in r.url:
-        orig_url = r.history[0].url
-        # TODO: Determine if all of these parameters are necessary.
-        payload = {'__ac_name': config.username,
-                   '__ac_password': config.password,
-                   'came_from': '',
-                   'cookies_enabled': '',
-                   'form.submitted': 1,
-                   'js_enabled': 0,
-                   'login_name': '',
-                   'pwd_empty': 0,
-                   'submit': 'Log in'}
-        auth_url = "https://%s/login_form" % self.get_site()
-        auth_r = self.session.post(auth_url, payload, verify=False)
+      # using credentials stored in the config module. Also force
+      # login for the sitemap on the staff site.
+      if ('require_login' in r.url or
+          request_url == 'https://staff.dm.org/sitemap/CookedBody'):
+        self.log_in("https://%s/login_form" % self.get_site())
         r = self.session.request(method, request_url, verify=False)
       if r.status_code == 404:
-        msg = "Server returned error status %s" % r.status_code
+        msg = "Server returned error status %s attempting to load URL %s" % (r.status_code, r.url)
         raise NotFoundError, msg
       elif r.status_code == 400:
         msg = "Server returned error status %s" % r.status_code
@@ -87,8 +97,8 @@ class RemoteResource:
 
   def strip_plone_suffix(self, url):
     """Return URL with any Plone-specific suffixes removed."""
-    suffixes = ['/document_view', '/folder_contents', '/image_large',
-                '/image_preview',
+    suffixes = ['/document_view', '/download', '/folder_contents',
+                '/image_large', '/image_preview',
                 '/image_mini', '/image_thumb', '/image_tile',
                 '/image_icon', '/image_listing', '/view']
     # First strip off a trailing slash if it's there.
@@ -135,8 +145,11 @@ class RemoteLinkTarget(RemoteResource):
       msg = "Resource %s not part of site %s" % (link, site)
       raise OffsiteError, msg
 
-    self.absolute_url = self.make_http_request('absolute_url',
-                                               full_url = full_url)
+    # Set the absolute URL to the linked URL as a first
+    # approximation. (It needs to be set to something in order
+    # to call make_http_request to look up the real absolute_url.
+    self.absolute_url = full_url
+    self.absolute_url = self.make_http_request('absolute_url')
 
     if not self.is_valid_url(self.absolute_url):
       raise ValueError, "Invalid URL %s" % self.absolute_url
@@ -151,9 +164,11 @@ class RemoteObject(RemoteResource):
     else:
       self.session = requests.Session()
 
-    self.absolute_url = self.make_http_request('absolute_url',
-                                               full_url = url)
-
+    # Set the absolute URL to the parameter URL as a first
+    # approximation. (It needs to be set to something in order
+    # to call make_http_request to look up the real absolute_url.
+    self.absolute_url = url
+    self.absolute_url = self.make_http_request('absolute_url')
     if not self.is_valid_url(self.absolute_url):
       raise ValueError, "Invalid URL %s" % self.absolute_url[:256]
 
@@ -166,29 +181,58 @@ class RemoteObject(RemoteResource):
     # Retrieve the title and id (which we'll call "shortname")
     self.title = self.make_http_request('Title')
     self.shortname = urllib.unquote(self.relative_url[-1])
-    self.obj_type = self.make_http_request('Type')
+    
+    # Handle the sitemap specially because calling '/Type' on it
+    # returns the sitemap itself rather than a useful type.
+    if self.shortname == 'sitemap':
+      self.obj_type = 'Page'
+    else:
+      self.obj_type = self.make_http_request('Type')
+
     # Sometimes calling /Type on images returns "Plone Site," so
     # if that's what came back, double-check.
-    #if self.obj_type == 'Plone Site':
-    #  img_types = ['image/jpeg', 'image/png', 'image/gif']
-    #  if self.make_http_request('getContentType') in img_types:
-    #    self.obj_type = 'Image'
+    if self.obj_type == 'Plone Site':
+      img_types = ['image/jpeg', 'image/png', 'image/gif']
+      try:
+        if self.make_http_request('getContentType') in img_types:
+          self.obj_type = 'Image'
+      except NotFoundError:
+        self.soup = BeautifulSoup(self.make_http_request('view'))
     if self.obj_type in ['News Item', 'Page']:
       self.soup = BeautifulSoup(self.get_cooked_body())
     elif self.obj_type in ['Folder', 'Large Folder']:
-      self.soup = BeautifulSoup(self.get_folder_body())
+      self.soup = BeautifulSoup(self.make_http_request('view'))
+      self.soup = self.soup.select('#region-content')[0]
       self.default_page = self.make_http_request('getDefaultPage')
     elif self.obj_type == 'Image':
       self.image = self.make_http_request('image')
     elif self.obj_type == 'File':
-      self.file_data = self.make_http_request('getFile')
-    elif self.obj_type == 'Plone Site':
-      self.soup = BeautifulSoup('')
+      pass
+    #  self.file_data = self.make_http_request('getFile')
+    #elif self.obj_type == 'Plone Site':
     # TODO: fix this. collections should be able to report their
     # contents.  But there's an old error in the site that prevents
     # folder_contents from working.
     elif self.obj_type == 'Collection':
-      self.soup = BeautifulSoup('')
+      self.soup = BeautifulSoup(self.get_cooked_body())
+      search_criteria_str = self.make_http_request('listSearchCriteria')
+      
+      # Content Type criteria always have a certain ID.
+      type_id = 'crit__Type_ATPortalTypeCriterion'
+      if type_id in search_criteria_str: 
+        self.type_criterion = self.make_http_request("%s/getRawValue" % type_id)
+      # Path criteria always have a certain ID.
+      path_id = 'crit__path_ATRelativePathCriterion'
+      if path_id in search_criteria_str: 
+        self.path_criterion = self.make_http_request("%s/getRawValue" % path_id)
+      self.sort_criterion_str = self.make_http_request('getSortCriterion')
+      import pdb; pdb.set_trace()
+    elif self.obj_type == 'Plone Site':
+      # We already matched this above, so nothing more to do.
+      pass
+    else:
+      msg = "Unrecognized object type '%s' for URL %s" % (self.obj_type, self.absolute_url)
+      raise ValueError, msg
 
   def get_cooked_body(self):
     return self.make_http_request('CookedBody')
