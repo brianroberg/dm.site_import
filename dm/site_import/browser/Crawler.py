@@ -52,6 +52,12 @@ class Crawler(object):
     # We will crawl not only this object, but also:
     #    1. Any objects above it in the containment hierarchy
     #    2. Any objects it links to
+    #    3. The default view (e.g. of a folder), if set
+
+    # If a default view is set, add it to the list of targets
+    # to evaluate.
+    if hasattr(remote_obj, 'default_page'):
+      targets.append(remote_obj.default_page)
 
     for t in targets:
       if not t:
@@ -127,8 +133,10 @@ class Crawler(object):
                      'folder_constraintypes_form',
                      'folder_factories',
                      'folder_icon.gif',
+                     'html.png',
                      'image_icon.gif',
                      'info_icon.gif',
+                     'lock_icon.gif',
                      'login_form',
                      'logo.jpg',
                      'logout',
@@ -140,10 +148,12 @@ class Crawler(object):
                      'pdf_icon.gif',
                      'plone_memberprefs_panel',
                      '#portlet-navigation-tree',
+                     'RSS',
                      'search_form',
                      'select_default_view',
                      'sendto_form',
                      'spinner.gif',
+                     'topic_icon.gif',
                      'video.png',
                      'xls.png',
                      'zip.png']
