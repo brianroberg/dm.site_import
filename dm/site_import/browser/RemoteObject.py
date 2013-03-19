@@ -7,6 +7,33 @@ import urllib
 import urlparse
 
 
+def extract_sort_criterion(criterion_id):
+  cid = criterion_id
+  match = re.search('__([a-z]*)_', cid)
+  if match:
+    return match.group(1)
+  else:
+    msg = 'Unable to find sort criterion in string "%s"' % cid
+    raise ValueError, msg
+
+def strip_plone_suffix(url):
+  """Return URL with any Plone-specific suffixes removed."""
+  suffixes = ['/document_view', '/download', '/folder_contents',
+              '/image_large', '/image_preview',
+              '/image_mini', '/image_thumb', '/image_tile',
+              '/image_icon', '/image_listing', '/view']
+  # First strip off a trailing slash if it's there.
+  if url[-1] == '/':
+    url = url[:-1]
+
+  for s in suffixes:
+    if url[len(s) * -1:] == s:
+
+      return url[:len(s) * -1]
+
+  # If we make it down here, return the URL as-is.
+  return url
+
 class HTTPError(Exception):
   pass
 
@@ -95,23 +122,6 @@ class RemoteResource:
       return RemoteResource.http_requests[request_url]
 
 
-  def strip_plone_suffix(self, url):
-    """Return URL with any Plone-specific suffixes removed."""
-    suffixes = ['/document_view', '/download', '/folder_contents',
-                '/image_large', '/image_preview',
-                '/image_mini', '/image_thumb', '/image_tile',
-                '/image_icon', '/image_listing', '/view']
-    # First strip off a trailing slash if it's there.
-    if url[-1] == '/':
-      url = url[:-1]
-
-    for s in suffixes:
-      if url[len(s) * -1:] == s:
-
-        return url[:len(s) * -1]
-
-    # If we make it down here, return the URL as-is.
-    return url
 
 
   def is_valid_url(self, url):
@@ -137,7 +147,7 @@ class RemoteLinkTarget(RemoteResource):
 
     # Filter the URL we've constructed to remove any Plone-specific
     # suffixes.
-    full_url = self.strip_plone_suffix(full_url)
+    full_url = strip_plone_suffix(full_url)
 
     # Check whether this is an offsite link.
     netloc = urlparse.urlparse(link).netloc 
@@ -173,7 +183,7 @@ class RemoteObject(RemoteResource):
       raise ValueError, "Invalid URL %s" % self.absolute_url[:256]
 
     # Remove certain Plone-specific suffixes which we should ignore.
-    self.absolute_url = self.strip_plone_suffix(self.absolute_url)
+    self.absolute_url = strip_plone_suffix(self.absolute_url)
 
     relative_url_str = self.make_http_request('virtual_url_path')
     self.relative_url = relative_url_str.split('/')
@@ -214,7 +224,8 @@ class RemoteObject(RemoteResource):
     # contents.  But there's an old error in the site that prevents
     # folder_contents from working.
     elif self.obj_type == 'Collection':
-      self.soup = BeautifulSoup(self.get_cooked_body())
+      self.soup = BeautifulSoup(self.make_http_request('view'))
+      self.soup = self.soup.select('#region-content')[0]
       search_criteria_str = self.make_http_request('listSearchCriteria')
       
       # Content Type criteria always have a certain ID.
@@ -224,8 +235,9 @@ class RemoteObject(RemoteResource):
       # Path criteria always have a certain ID.
       path_id = 'crit__path_ATRelativePathCriterion'
       if path_id in search_criteria_str: 
-        self.path_criterion = self.make_http_request("%s/getRawValue" % path_id)
-      self.sort_criterion_str = self.make_http_request('getSortCriterion')
+        self.path_criterion = self.make_http_request("%s/getRelativePath" % path_id)
+      sort_criterion_id = self.make_http_request('getSortCriterion')
+      self.sort_criterion_str = extract_sort_criterion(sort_criterion_id)
       import pdb; pdb.set_trace()
     elif self.obj_type == 'Plone Site':
       # We already matched this above, so nothing more to do.
@@ -233,6 +245,7 @@ class RemoteObject(RemoteResource):
     else:
       msg = "Unrecognized object type '%s' for URL %s" % (self.obj_type, self.absolute_url)
       raise ValueError, msg
+
 
   def get_cooked_body(self):
     return self.make_http_request('CookedBody')

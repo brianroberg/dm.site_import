@@ -13,7 +13,9 @@ from dm.site_import.browser.ImportObject import (ImportObject, ImportFile,
                                                  ImportPage)
 from dm.site_import.browser.RemoteObject import (HTTPError, NotFoundError,
                                                  RemoteLinkTarget,
-                                                 RemoteObject, RemoteResource)
+                                                 RemoteObject, RemoteResource,
+                                                 extract_sort_criterion,
+                                                 strip_plone_suffix)
 
 
 def test_suite():
@@ -76,45 +78,51 @@ class RemoteObjectTesting(unittest.TestCase):
       remote_obj = RemoteObject('http://www.dm.org/about-us/our-staff/about-us/our-staff')
       self.assertEqual(remote_obj.absolute_url, 'http://www.dm.org/about-us/our-staff')
 
+    def test_extract_sort_criterion_effective(self):
+      criterion_id = 'crit__effective_ATSortCriterion'
+      self.assertEqual(extract_sort_criterion(criterion_id),
+                       'effective')
+
+    def test_extract_sort_criterion_error(self):
+      criterion_id = 'foobar'
+      with self.assertRaises(ValueError):
+        extract_sort_criterion(criterion_id)
+      
+    def test_extract_sort_criterion_modified(self):
+      criterion_id = 'crit__modified_ATSortCriterion'
+      self.assertEqual(extract_sort_criterion(criterion_id),
+                       'modified')
+
+
     def test_strip_plone_suffix_large(self):
-      remote_obj = RemoteObject('http://www.dm.org/site-homepage')
-      self.assertEqual(remote_obj.strip_plone_suffix('http://www.dm.org/foo.jpg/image_large'), 'http://www.dm.org/foo.jpg')
+      self.assertEqual(strip_plone_suffix('http://www.dm.org/foo.jpg/image_large'), 'http://www.dm.org/foo.jpg')
 
     def test_strip_plone_suffix_preview(self):
-      remote_obj = RemoteObject('http://www.dm.org/site-homepage')
-      self.assertEqual(remote_obj.strip_plone_suffix('http://www.dm.org/foo.jpg/image_preview'), 'http://www.dm.org/foo.jpg')
+      self.assertEqual(strip_plone_suffix('http://www.dm.org/foo.jpg/image_preview'), 'http://www.dm.org/foo.jpg')
 
     def test_strip_plone_suffix_mini(self):
-      remote_obj = RemoteObject('http://www.dm.org/site-homepage')
-      self.assertEqual(remote_obj.strip_plone_suffix('http://www.dm.org/foo.jpg/image_mini'), 'http://www.dm.org/foo.jpg')
+      self.assertEqual(strip_plone_suffix('http://www.dm.org/foo.jpg/image_mini'), 'http://www.dm.org/foo.jpg')
 
     def test_strip_plone_suffix_thumb(self):
-      remote_obj = RemoteObject('http://www.dm.org/site-homepage')
-      self.assertEqual(remote_obj.strip_plone_suffix('http://www.dm.org/foo.jpg/image_thumb'), 'http://www.dm.org/foo.jpg')
+      self.assertEqual(strip_plone_suffix('http://www.dm.org/foo.jpg/image_thumb'), 'http://www.dm.org/foo.jpg')
 
     def test_strip_plone_suffix_tile(self):
-      remote_obj = RemoteObject('http://www.dm.org/site-homepage')
-      self.assertEqual(remote_obj.strip_plone_suffix('http://www.dm.org/foo.jpg/image_tile'), 'http://www.dm.org/foo.jpg')
+      self.assertEqual(strip_plone_suffix('http://www.dm.org/foo.jpg/image_tile'), 'http://www.dm.org/foo.jpg')
 
     def test_strip_plone_suffix_icon(self):
-      remote_obj = RemoteObject('http://www.dm.org/site-homepage')
-      self.assertEqual(remote_obj.strip_plone_suffix('http://www.dm.org/foo.jpg/image_icon'), 'http://www.dm.org/foo.jpg')
+      self.assertEqual(strip_plone_suffix('http://www.dm.org/foo.jpg/image_icon'), 'http://www.dm.org/foo.jpg')
 
     def test_strip_plone_suffix_listing(self):
-      remote_obj = RemoteObject('http://www.dm.org/site-homepage')
-      self.assertEqual(remote_obj.strip_plone_suffix('http://www.dm.org/foo.jpg/image_listing'), 'http://www.dm.org/foo.jpg')
+      self.assertEqual(strip_plone_suffix('http://www.dm.org/foo.jpg/image_listing'), 'http://www.dm.org/foo.jpg')
 
     def test_strip_plone_suffix_trailing_slash(self):
-      remote_obj = RemoteObject('http://www.dm.org/site-homepage')
-      self.assertEqual(remote_obj.strip_plone_suffix('http://www.dm.org/foo.jpg/'), 'http://www.dm.org/foo.jpg')
+      self.assertEqual(strip_plone_suffix('http://www.dm.org/foo.jpg/'), 'http://www.dm.org/foo.jpg')
 
     def test_strip_plone_suffix_no_change(self):
-      remote_obj = RemoteObject('http://www.dm.org/site-homepage')
-      self.assertEqual(remote_obj.strip_plone_suffix('http://www.dm.org/foo.jpg'), 'http://www.dm.org/foo.jpg')
+      self.assertEqual(strip_plone_suffix('http://www.dm.org/foo.jpg'), 'http://www.dm.org/foo.jpg')
 
     def test_strip_plone_suffix_view(self):
-      remote_obj = RemoteObject('http://www.dm.org/site-homepage')
-      self.assertEqual(remote_obj.strip_plone_suffix('http://www.dm.org/foo.jpg/view'), 'http://www.dm.org/foo.jpg')
+      self.assertEqual(strip_plone_suffix('http://www.dm.org/foo.jpg/view'), 'http://www.dm.org/foo.jpg')
 
     def test_is_valid_url(self):
       remote_obj = RemoteObject('http://www.dm.org/site-homepage')
