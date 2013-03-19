@@ -1,7 +1,7 @@
 from Products.Five.browser import BrowserView
 from Crawler import Crawler
 from ImportObject import (ImportObject, ImportFile, ImportFolder, 
-                          ImportImage, ImportPage)
+                          ImportImage, ImportPage, ImportCollection)
 from RemoteObject import (HTTPError, NotFoundError, RemoteLinkTarget,
                           RemoteObject)
 import config
@@ -12,8 +12,8 @@ class DMSiteImportView(BrowserView):
     self.remove_events_and_news()
 
     #starting_url = 'http://www.dm.org'
-    #starting_url = 'http://gettysburg.dm.org/audio-archive/fall-2012-jesus-is-better-matthews-gospel'
-    starting_url = 'https://staff.dm.org'
+    #starting_url = 'http://gettysburg.dm.org/audio-archive/fall-2012-jesus-is-better-matthews-gospel/jesus-is-better-matthews-gospel'
+    starting_url = 'http://gettysburg.dm.org'
 
     crawler = Crawler(starting_url)
     import_objects = crawler.get_import_objects()
@@ -39,6 +39,14 @@ class DMSiteImportView(BrowserView):
       elif remote_obj.obj_type == 'File':
         import_obj = ImportFile(remote_obj, self)
         import_obj.create()
+      elif remote_obj.obj_type == 'Collection':
+        import_obj = ImportCollection(remote_obj, self)
+        import_obj.create()
+      elif remote_obj.obj_type == 'Plone Site':
+        pass
+      else:
+        msg = 'Unknown type "%s" for remote object at %s' % (remote_obj.obj_type, remote_obj.absolute_url)
+        raise ValueError, msg
 
 
 

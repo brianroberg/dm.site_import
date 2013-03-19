@@ -26,6 +26,38 @@ class ImportObject(object):
       self.site_obj.setTitle(self.remote_obj.title)
 
 
+class ImportCollection(ImportObject):
+
+  def __init__(self, remote_obj, view_obj):
+    self.type_name = 'Collection'
+    ImportObject.__init__(self, remote_obj, view_obj)
+
+  def create(self):
+    try:
+      ImportObject.create(self)
+    except ObjectAlreadyExistsError:
+      print "%s already exists, exiting create()" % self.remote_obj.shortname
+    else:
+      query = []
+      if hasattr(self.remote_obj, 'type_criterion'):
+        query.append({
+          'i': 'portal_type',
+          'o': 'plone.app.querystring.operation.selection.is',
+          'v': self.remote_obj.type_criterion})
+      if hasattr(self.remote_obj, 'relative_path_criterion'):
+        query.append({
+          'i': 'path',
+          'o': 'plone.app.querystring.operation.string.relativePath',
+          'v': self.remote_obj.relative_path_criterion})
+
+      # If we've found any search criteria, apply them now.
+      if query:
+        self.site_obj.setQuery(query)
+
+      if hasattr(self.remote_obj, 'sort_criterion_str'):
+        self.site_obj.setSort_on(self.remote_obj.sort_criterion_str)
+      self.site_obj.reindexObject()
+
 class ImportFile(ImportObject):
 
   def __init__(self, remote_obj, view_obj):
@@ -55,7 +87,7 @@ class ImportFolder(ImportObject):
       print "%s already exists, exiting create()" % self.remote_obj.shortname
     else:
       if self.remote_obj.default_page:
-	self.site_obj.setDefaultPage(self.remote_obj.default_page)
+        self.site_obj.setDefaultPage(self.remote_obj.default_page)
       self.site_obj.reindexObject()
 
 

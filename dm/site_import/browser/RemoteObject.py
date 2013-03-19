@@ -217,8 +217,7 @@ class RemoteObject(RemoteResource):
     elif self.obj_type == 'Image':
       self.image = self.make_http_request('image')
     elif self.obj_type == 'File':
-      pass
-    #  self.file_data = self.make_http_request('getFile')
+      self.file_data = self.make_http_request('getFile')
     #elif self.obj_type == 'Plone Site':
     # TODO: fix this. collections should be able to report their
     # contents.  But there's an old error in the site that prevents
@@ -231,14 +230,19 @@ class RemoteObject(RemoteResource):
       # Content Type criteria always have a certain ID.
       type_id = 'crit__Type_ATPortalTypeCriterion'
       if type_id in search_criteria_str: 
-        self.type_criterion = self.make_http_request("%s/getRawValue" % type_id)
+        self.type_criterion = eval(self.make_http_request("%s/getRawValue" % type_id))
+        if len(self.type_criterion) > 1:
+          print "**** Collection %s specifies more than one type. Handling of multiple types not yet implemented." % self.absolute_url
+          import pdb; pdb.set_trace()
+        # TODO: Handle multiple types correctly.
+        self.type_criterion = self.type_criterion[0]
+
       # Path criteria always have a certain ID.
       path_id = 'crit__path_ATRelativePathCriterion'
       if path_id in search_criteria_str: 
-        self.path_criterion = self.make_http_request("%s/getRelativePath" % path_id)
+        self.relative_path_criterion = self.make_http_request("%s/getRelativePath" % path_id)
       sort_criterion_id = self.make_http_request('getSortCriterion')
       self.sort_criterion_str = extract_sort_criterion(sort_criterion_id)
-      import pdb; pdb.set_trace()
     elif self.obj_type == 'Plone Site':
       # We already matched this above, so nothing more to do.
       pass
