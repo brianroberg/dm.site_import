@@ -8,12 +8,12 @@ import urlparse
 
 
 def extract_sort_criterion(criterion_id):
-  cid = criterion_id
-  match = re.search('__([a-z]*)_', cid)
+  crit_id = criterion_id
+  match = re.search('__([a-z]*)_', crit_id)
   if match:
     return match.group(1)
   else:
-    msg = 'Unable to find sort criterion in string "%s"' % cid
+    msg = 'Unable to find sort criterion in string "%s"' % crit_id
     raise ValueError, msg
 
 def strip_plone_suffix(url):
@@ -217,7 +217,8 @@ class RemoteObject(RemoteResource):
     elif self.obj_type == 'Image':
       self.image = self.make_http_request('image')
     elif self.obj_type == 'File':
-      self.file_data = self.make_http_request('getFile')
+      #self.file_data = self.make_http_request('getFile')
+      pass
     #elif self.obj_type == 'Plone Site':
     # TODO: fix this. collections should be able to report their
     # contents.  But there's an old error in the site that prevents
@@ -226,23 +227,32 @@ class RemoteObject(RemoteResource):
       self.soup = BeautifulSoup(self.make_http_request('view'))
       self.soup = self.soup.select('#region-content')[0]
       search_criteria_str = self.make_http_request('listSearchCriteria')
-      
-      # Content Type criteria always have a certain ID.
-      type_id = 'crit__Type_ATPortalTypeCriterion'
-      if type_id in search_criteria_str: 
-        self.type_criterion = eval(self.make_http_request("%s/getRawValue" % type_id))
-        if len(self.type_criterion) > 1:
-          print "**** Collection %s specifies more than one type. Handling of multiple types not yet implemented." % self.absolute_url
-          import pdb; pdb.set_trace()
-        # TODO: Handle multiple types correctly.
-        self.type_criterion = self.type_criterion[0]
 
-      # Path criteria always have a certain ID.
-      path_id = 'crit__path_ATRelativePathCriterion'
-      if path_id in search_criteria_str: 
-        self.relative_path_criterion = self.make_http_request("%s/getRelativePath" % path_id)
+      # Transform the string into a list of criterion IDs.
+      crit_ids = re.findall('at (\S+)>', search_criteria_str)
+      crit_ids = [crit_id.split('/')[-1] for crit_id in crit_ids]
+
+      for crit_id in crit_ids:
+        if crit_id == 'crit__Type_ATPortalTypeCriterion':
+          self.type_criterion = eval(self.make_http_request("%s/getRawValue" % crit_id))
+          if len(self.type_criterion) > 1:
+            print "**** Collection %s specifies more than one type. Handling of multiple types not yet implemented." % self.absolute_url
+            import pdb; pdb.set_trace()
+          # TODO: Handle multiple types correctly.
+          self.type_criterion = self.type_criterion[0]
+        elif crit_id == 'crit__path_ATRelativePathCriterion':
+          self.relative_path_criterion = self.make_http_request("%s/getRelativePath" % crit_id)
+        else:
+          print "**** Collection %s has a criterion I don't know how to handle: %s" % (self.absolute_url, crit_id)
+          import pdb; pdb.set_trace()
+
+          
       sort_criterion_id = self.make_http_request('getSortCriterion')
       self.sort_criterion_str = extract_sort_criterion(sort_criterion_id)
+      import pdb; pdb.set_trace()
+
+
+
     elif self.obj_type == 'Plone Site':
       # We already matched this above, so nothing more to do.
       pass
