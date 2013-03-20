@@ -9,7 +9,7 @@ import urlparse
 
 def extract_sort_criterion(criterion_id):
   crit_id = criterion_id
-  match = re.search('__([a-z]*)_', crit_id)
+  match = re.search('__([a-zA-Z]*)_', crit_id)
   if match:
     return match.group(1)
   else:
@@ -233,23 +233,39 @@ class RemoteObject(RemoteResource):
       crit_ids = [crit_id.split('/')[-1] for crit_id in crit_ids]
 
       for crit_id in crit_ids:
+
+        # Type
         if crit_id == 'crit__Type_ATPortalTypeCriterion':
-          self.type_criterion = eval(self.make_http_request("%s/getRawValue" % crit_id))
+          try:
+            url = "%s/getRawValue" % crit_id
+            result = self.make_http_request(url)
+            self.type_criterion = eval(result)
+          except SyntaxError:
+            msg = "Error eval'ing result of %s/%s. Result = %s" % (self.absolute_url, url, result)
+            raise SyntaxError, msg
+
           if len(self.type_criterion) > 1:
             print "**** Collection %s specifies more than one type. Handling of multiple types not yet implemented." % self.absolute_url
             import pdb; pdb.set_trace()
           # TODO: Handle multiple types correctly.
           self.type_criterion = self.type_criterion[0]
+
+        # Relative Path
         elif crit_id == 'crit__path_ATRelativePathCriterion':
           self.relative_path_criterion = self.make_http_request("%s/getRelativePath" % crit_id)
+
+        # Creation Date
+        elif crit_id == 'crit__created_ATFriendlyDateCriteria':
+          self.relative_date_value = self.make_http_request("%s/Value" % crit_id)
+
         else:
           print "**** Collection %s has a criterion I don't know how to handle: %s" % (self.absolute_url, crit_id)
           import pdb; pdb.set_trace()
 
           
       sort_criterion_id = self.make_http_request('getSortCriterion')
-      self.sort_criterion_str = extract_sort_criterion(sort_criterion_id)
-      import pdb; pdb.set_trace()
+      if sort_criterion_id:
+        self.sort_criterion_str = extract_sort_criterion(sort_criterion_id)
 
 
 
