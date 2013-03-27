@@ -13,7 +13,9 @@ from dm.site_import.browser.ImportObject import (ImportObject, ImportFile,
                                                  ImportPage)
 from dm.site_import.browser.RemoteObject import (HTTPError, NotFoundError,
                                                  RemoteLinkTarget,
+                                                 OffsiteError,
                                                  RemoteObject, RemoteResource,
+                                                 extract_index_url,
                                                  extract_sort_criterion,
                                                  strip_plone_suffix)
 
@@ -22,7 +24,8 @@ def test_suite():
   suite = unittest.TestSuite()
   suite.addTests([
     unittest.makeSuite(CrawlerTesting),
-    unittest.makeSuite(RemoteObjectTesting)
+    unittest.makeSuite(RemoteObjectTesting),
+    unittest.makeSuite(RemoteLinkTargetTesting),
   ])
   return suite
 
@@ -63,8 +66,30 @@ class CrawlerTesting(unittest.TestCase):
     self.assertFalse(crawler.needs_crawled(url))
 
 
+class RemoteLinkTargetTesting(unittest.TestCase):
+  def setUp(self):
+    self.site = 'www.dm.org'
+    self.base_url = 'http://www.dm.org/'
+
+  def test_is_offsite_link_our_staff(self):
+    link = 'about-us/our-staff'
+    rlt = RemoteLinkTarget(self.site, self.base_url, link)
+    self.assertFalse(rlt.is_offsite_link())
+
+  def test_is_offsite_link_regonline(self):
+    link = 'http://www.regonline.com'
+    with self.assertRaises(OffsiteError):
+      rlt = RemoteLinkTarget(self.site, self.base_url, link)
+
+  def test_is_offsite_link_gettysburg(self):
+    link = 'http://gettysburg.dm.org/site-homepage'
+    with self.assertRaises(OffsiteError):
+      rlt = RemoteLinkTarget(self.site, self.base_url, link)
+
+
 
 class RemoteObjectTesting(unittest.TestCase):
+
 
     def testAbsoluteUrl(self):
       remote_obj = RemoteObject('http://www.dm.org/site-homepage')
@@ -77,6 +102,26 @@ class RemoteObjectTesting(unittest.TestCase):
     def testAbsoluteUrlDoubleDouble(self):
       remote_obj = RemoteObject('http://www.dm.org/about-us/our-staff/about-us/our-staff')
       self.assertEqual(remote_obj.absolute_url, 'http://www.dm.org/about-us/our-staff')
+
+    def test_extract_index_url_http(self):
+      self.assertEqual(extract_index_url('http://www.dm.org'),
+                       'www.dm.org')
+      
+    def test_extract_index_url_https(self):
+      self.assertEqual(extract_index_url('https://www.dm.org'),
+                       'www.dm.org')
+
+    def test_extract_index_url_path(self):
+      full_url = 'https://www.dm.org/about-us/our-staff'
+      self.assertEqual(extract_index_url(full_url),
+                       'www.dm.org/about-us/our-staff')
+
+    def test_extract_index_url_query(self):
+      full_url = 'https://www.dm.org/about-us/our-staff?arg=1'
+      self.assertEqual(extract_index_url(full_url),
+                       'www.dm.org/about-us/our-staff')
+
+
 
     def test_extract_sort_criterion_effective(self):
       criterion_id = 'crit__effective_ATSortCriterion'
@@ -92,6 +137,20 @@ class RemoteObjectTesting(unittest.TestCase):
       criterion_id = 'crit__modified_ATSortCriterion'
       self.assertEqual(extract_sort_criterion(criterion_id),
                        'modified')
+
+    def test_get_local_roles_about_us(self):
+      # This folder doesn't have any local roles
+      url = 'http://www.dm.org/about-us/'
+      correct_roles = ()
+      remote_obj = RemoteObject(url)
+      self.assertEqual(remote_obj.get_local_roles(), correct_roles)
+
+    def test_get_local_roles_aseyevv(self):
+      # This folder is owned by Vadim and Jenny
+      url = 'http://www.dm.org/about-us/our-staff/aseyevv'
+      correct_roles = ('aseyevj', ('Owner',)), ('aseyevv', ('Owner',))
+      remote_obj = RemoteObject(url)
+      self.assertEqual(remote_obj.get_local_roles(), correct_roles)
 
 
     def test_strip_plone_suffix_large(self):

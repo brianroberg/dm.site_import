@@ -6,6 +6,11 @@ import requests
 import urllib
 import urlparse
 
+# TODO: Test this function and then use it so that we don't
+# crawl every URL twice!
+def extract_index_url(url):
+  o = urlparse.urlparse(url)
+  return "%s%s" % (o.netloc, o.path)
 
 def extract_sort_criterion(criterion_id):
   crit_id = criterion_id
@@ -50,7 +55,15 @@ class OffsiteError(HTTPError):
   pass
 
 class RemoteResource:
-  http_requests = {}
+  # A simple cache to store results of HTTP requests.
+  # Pre-load with a few URLs that don't return the correct
+  # thing on their own.
+  http_requests = {'www.dm.org/give/paypal/choose-fund-preference/Type': 'Page',
+                   'www.dm.org/join/staff/apply/app/index_html/Type': 'Page',
+                   'www.dm.org/index_html/Type': 'Page',
+                   'www.dm.org/random_img/Type': 'Image'}
+
+  form_folders = []
 
   def __str__(self):
     if isinstance(self, RemoteObject):
@@ -60,7 +73,9 @@ class RemoteResource:
     else:
       return "unknown RemoteResource object"
 
-
+  def get_index_url(self):
+    return extract_index_url(self.absolute_url)
+  
   def get_site(self):
     return urlparse.urlparse(self.absolute_url).netloc
 
@@ -91,7 +106,7 @@ class RemoteResource:
 
     # Check whether we've already made this request. If so, use the
     # result we got last time instead of making it again.
-    if request_url not in RemoteResource.http_requests:
+    if extract_index_url(request_url) not in RemoteResource.http_requests:
       try:
         r = self.session.request(method, request_url, verify=False)
       except requests.TooManyRedirects:
@@ -116,10 +131,10 @@ class RemoteResource:
         import pdb; pdb.set_trace()
         raise HTTPError, msg
 
-      RemoteResource.http_requests[request_url] = r.content
+      RemoteResource.http_requests[extract_index_url(request_url)] = r.content
       return r.content
     else:
-      return RemoteResource.http_requests[request_url]
+      return RemoteResource.http_requests[extract_index_url(request_url)]
 
 
 
@@ -149,10 +164,8 @@ class RemoteLinkTarget(RemoteResource):
     # suffixes.
     full_url = strip_plone_suffix(full_url)
 
-    # Check whether this is an offsite link.
-    netloc = urlparse.urlparse(link).netloc 
-    if netloc and (netloc != site):
-      msg = "Resource %s not part of site %s" % (link, site)
+    if self.is_offsite_link():
+      msg = "Resource %s not part of site %s" % (self.link, self.site)
       raise OffsiteError, msg
 
     # Set the absolute URL to the linked URL as a first
@@ -163,6 +176,13 @@ class RemoteLinkTarget(RemoteResource):
 
     if not self.is_valid_url(self.absolute_url):
       raise ValueError, "Invalid URL %s" % self.absolute_url
+
+  def is_offsite_link(self):
+    # Check whether this is an offsite link.
+    netloc = urlparse.urlparse(self.link).netloc 
+    if netloc and (netloc != self.site):
+      return True
+    return False
 
 
 class RemoteObject(RemoteResource):
@@ -219,7 +239,8 @@ class RemoteObject(RemoteResource):
     elif self.obj_type == 'File':
       #self.file_data = self.make_http_request('getFile')
       pass
-    #elif self.obj_type == 'Plone Site':
+    elif self.obj_type == 'Link':
+      self.link_target = self.make_http_request('getRemoteUrl')
     # TODO: fix this. collections should be able to report their
     # contents.  But there's an old error in the site that prevents
     # folder_contents from working.
@@ -245,10 +266,8 @@ class RemoteObject(RemoteResource):
             raise SyntaxError, msg
 
           if len(self.type_criterion) > 1:
-            print "**** Collection %s specifies more than one type. Handling of multiple types not yet implemented." % self.absolute_url
-            import pdb; pdb.set_trace()
-          # TODO: Handle multiple types correctly.
-          self.type_criterion = self.type_criterion[0]
+            self.type_criteria = self.type_criterion
+            self.type_criterion = self.type_criterion[0]
 
         # Relative Path
         elif crit_id == 'crit__path_ATRelativePathCriterion':
@@ -269,9 +288,16 @@ class RemoteObject(RemoteResource):
 
 
 
+    elif self.obj_type == 'Form Folder':
+      print "Found a form folder at %s" % self.absolute_url
+      RemoteResource.form_folders.append(self.absolute_url)
+      print "Total form folers: %s" % len(RemoteResource.form_folders)
     elif self.obj_type == 'Plone Site':
       # We already matched this above, so nothing more to do.
       pass
+    elif self.obj_type[:21] == '<!DOCTYPE html PUBLIC':
+      print "/Type seems to have returned a whole HTML page for URL %s" % self.absolute_url
+      import pdb; pdb.set_trace()
     else:
       msg = "Unrecognized object type '%s' for URL %s" % (self.obj_type, self.absolute_url)
       raise ValueError, msg
@@ -288,6 +314,7 @@ class RemoteObject(RemoteResource):
   def get_images(self):
     return [image for image in self.soup.find_all('img')]
 
+
   def get_link_targets(self):
     """Return a list of URLs linked to in the remote object."""
     targets = [link.get('href') for link in self.get_links()]
@@ -301,4 +328,5 @@ class RemoteObject(RemoteResource):
       print "obj_type = %s" % self.obj_type
       raise AttributeError, msg
 
-
+  def get_local_roles(self):
+    return eval(self.make_http_request('site_import_get_local_roles'))

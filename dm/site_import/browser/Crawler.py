@@ -1,7 +1,8 @@
 from ImportObject import (ImportObject, ImportFile, ImportFolder, 
                           ImportImage, ImportPage)
 from RemoteObject import (BadRequestError, HTTPError, NotFoundError,
-                          RemoteLinkTarget, RemoteObject)
+                          RemoteLinkTarget, RemoteObject,
+                          extract_index_url)
 import requests
 import urlparse
 
@@ -31,7 +32,7 @@ class Crawler(object):
   def get_import_objects(self):
 
     start_page = RemoteObject(self.starting_url, session = self.session)
-    self.objects_seen[start_page.absolute_url] = start_page
+    self.objects_seen[start_page.get_index_url()] = start_page
     self.crawl(start_page)
 
     return self.objects_seen
@@ -39,7 +40,8 @@ class Crawler(object):
   def contains_skip_string(self, url):
     # There are some string patterns in URLs which tell us
     # right away that we don't want to follow the link.
-    skip_strings = ['@@', '++resource++', 'createObject?']
+    skip_strings = ['@@', '++resource++', 'createObject?',
+                    'support_stats_entry_form']
     for s in skip_strings:
       if s in url:
         return True
@@ -77,8 +79,8 @@ class Crawler(object):
 
       if self.needs_crawled(rlt.absolute_url):
         # limit extent of crawling during development
-        #if len(self.objects_seen.keys()) > 100:
-        #  print "100 objects seen, breaking loop"
+        #if len(self.objects_seen.keys()) > 50:
+        #  print "50 objects seen, breaking loop"
         #  break
 
         # Create a RemoteObject to represent the piece of content we're
@@ -101,7 +103,7 @@ class Crawler(object):
     if (len(remote_obj.relative_url) > 1) and self.needs_crawled(parent_url):
       self.queue(RemoteObject(parent_url, session = self.session))
 
-    self.objects_seen[remote_obj.absolute_url] = remote_obj
+    self.objects_seen[remote_obj.get_index_url()] = remote_obj
     print "*** %s *** %s" % (len(self.objects_seen.keys()),
                              remote_obj.absolute_url)
 
@@ -111,7 +113,7 @@ class Crawler(object):
 
 
   def needs_crawled(self, url):
-    if url in self.objects_seen:
+    if extract_index_url(url) in self.objects_seen:
       return False
     if url in self.skip_list:
       return False
@@ -133,6 +135,7 @@ class Crawler(object):
                      'folder_constraintypes_form',
                      'folder_factories',
                      'folder_icon.gif',
+                     'Form.gif',
                      'html.png',
                      'image_icon.gif',
                      'info_icon.gif',
@@ -146,6 +149,7 @@ class Crawler(object):
                      'object_copy',
                      'ods.png',
                      'odt.png',
+                     'pdf.png',
                      'pdf_icon.gif',
                      'plone_control_panel',
                      'plone_memberprefs_panel',
@@ -156,6 +160,7 @@ class Crawler(object):
                      'sendto_form',
                      'spinner.gif',
                      'topic_icon.gif',
+                     'user.gif',
                      'video.png',
                      'xls.png',
                      'zip.png']
