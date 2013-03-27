@@ -1,3 +1,5 @@
+import urllib
+
 class ObjectAlreadyExistsError(ValueError):
   pass
 
@@ -13,7 +15,7 @@ class ImportObject(object):
     print "Running create() for %s %s" % (self.type_name,
                                           self.absolute_url)
     if len(self.relative_url) > 1:
-      relative_url_str = '/'.join(self.relative_url[:-1])
+      relative_url_str = urllib.unquote('/'.join(self.relative_url[:-1]))
       container = self.view_obj.context.unrestrictedTraverse(relative_url_str)
     else:
       container = self.view_obj.context
@@ -70,7 +72,7 @@ class ImportFile(ImportObject):
     except ObjectAlreadyExistsError:
       print "%s already exists, exiting create()" % self.remote_obj.shortname
     else:
-      self.site_obj.setFile(self.remote_obj.file_data)
+      #self.site_obj.setFile(self.remote_obj.file_data)
       self.site_obj.reindexObject()
 
 
@@ -106,6 +108,21 @@ class ImportImage(ImportObject):
       self.site_obj.setImage(self.remote_obj.image)
       self.site_obj.reindexObject()
 
+
+class ImportLink(ImportObject):
+
+  def __init__(self, remote_obj, view_obj):
+    self.type_name = 'Link'
+    ImportObject.__init__(self, remote_obj, view_obj)
+
+  def create(self):
+    try:
+      ImportObject.create(self)
+    except ObjectAlreadyExistsError:
+      print "%s already exists, exiting create()" % self.remote_obj.shortname
+    else:
+      self.site_obj.setRemoteUrl(self.remote_obj.link_target)
+      self.site_obj.reindexObject()
 
 class ImportPage(ImportObject):
 
