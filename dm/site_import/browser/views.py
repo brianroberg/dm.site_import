@@ -11,9 +11,10 @@ class DMSiteImportView(BrowserView):
   def __call__(self):
     self.remove_events_and_news()
 
-    #starting_url = 'http://www.dm.org'
+    #starting_url = 'http://www.dm.org/about-us/our-staff/drippsb'
     #starting_url = 'http://gettysburg.dm.org/audio-archive/fall-2012-jesus-is-better-matthews-gospel/jesus-is-better-matthews-gospel'
-    starting_url = 'http://gettysburg.dm.org'
+    #starting_url = 'http://gettysburg.dm.org'
+    starting_url = 'https://staff.dm.org'
 
     crawler = Crawler(starting_url)
     import_objects = crawler.get_import_objects()
@@ -38,6 +39,9 @@ class DMSiteImportView(BrowserView):
         import_obj.create()
       elif remote_obj.obj_type == 'File':
         import_obj = ImportFile(remote_obj, self)
+        import_obj.create()
+      elif remote_obj.obj_type == 'Link':
+        import_obj = ImportLink(remote_obj, self)
         import_obj.create()
       elif remote_obj.obj_type == 'Collection':
         import_obj = ImportCollection(remote_obj, self)
