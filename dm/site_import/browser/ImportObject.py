@@ -27,6 +27,17 @@ class ImportObject(object):
       self.site_obj = container[self.remote_obj.shortname]
       self.site_obj.setTitle(self.remote_obj.title)
 
+      import pdb; pdb.set_trace()
+      # TODO: Figure out why setting modification date isn't working.
+      # Metadata
+      if hasattr(self.remote_obj, 'creator'):
+        self.site_obj.addCreator(self.remote_obj.creator)
+      if hasattr(self.remote_obj, 'creation_date'):
+        self.site_obj.setCreationDate(self.remote_obj.creation_date)
+      if hasattr(self.remote_obj, 'modification_date'):
+        self.site_obj.setModificationDate(self.remote_obj.modification_date)
+      
+
 
 class ImportCollection(ImportObject):
 

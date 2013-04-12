@@ -1,10 +1,24 @@
 from bs4 import BeautifulSoup
+from datetime import datetime
 import config
 import httplib
 import re
 import requests
 import urllib
 import urlparse
+
+def extract_datetime(date_str):
+  if date_str[:21] == '<!DOCTYPE html PUBLIC':
+    return None
+  pattern = '(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})'
+  match = re.match(pattern, date_str)
+  if match:
+    return datetime.strptime(match.group(), '%Y/%m/%d %H:%M:%S')
+  else:
+    msg = 'Regexp match failure for date string "%s"' % date_str
+    raise ValueError, msg
+  
+
 
 # TODO: Test this function and then use it so that we don't
 # crawl every URL twice!
@@ -211,6 +225,13 @@ class RemoteObject(RemoteResource):
     # Retrieve the title and id (which we'll call "shortname")
     self.title = self.make_http_request('Title')
     self.shortname = urllib.unquote(self.relative_url[-1])
+
+    # Retrieve other metadata
+    self.creator = self.make_http_request('Creator')
+    cdate_str = self.make_http_request('created')
+    self.creation_date = extract_datetime(cdate_str)
+    mdate_str = self.make_http_request('modified')
+    self.modification_date = extract_datetime(mdate_str)
     
     # Handle the sitemap specially because calling '/Type' on it
     # returns the sitemap itself rather than a useful type.
