@@ -36,6 +36,12 @@ class ImportObject(object):
       if hasattr(self.remote_obj, 'modification_date'):
         self.site_obj.setModificationDate(self.remote_obj.modification_date)
       
+  def reindex(self):
+    """Call reindexObject on the site_obj without resetting mod date."""
+    od = self.site_obj.__dict__
+    od['notifyModified'] = lambda *args: None
+    self.site_obj.reindexObject()
+    del od['notifyModified']
 
 
 class ImportCollection(ImportObject):
@@ -68,7 +74,7 @@ class ImportCollection(ImportObject):
 
       if hasattr(self.remote_obj, 'sort_criterion_str'):
         self.site_obj.setSort_on(self.remote_obj.sort_criterion_str)
-      self.site_obj.reindexObject()
+      self.reindex()
 
 class ImportFile(ImportObject):
 
@@ -82,8 +88,8 @@ class ImportFile(ImportObject):
     except ObjectAlreadyExistsError:
       print "%s already exists, exiting create()" % self.remote_obj.shortname
     else:
-      #self.site_obj.setFile(self.remote_obj.file_data)
-      self.site_obj.reindexObject()
+      self.site_obj.setFile(self.remote_obj.file_data)
+      self.reindex()
 
 
 class ImportFolder(ImportObject):
@@ -100,7 +106,7 @@ class ImportFolder(ImportObject):
     else:
       if self.remote_obj.default_page:
         self.site_obj.setDefaultPage(self.remote_obj.default_page)
-      self.site_obj.reindexObject()
+      self.reindex()
 
 
 class ImportImage(ImportObject):
@@ -116,7 +122,7 @@ class ImportImage(ImportObject):
       print "%s already exists, exiting create()" % self.remote_obj.shortname
     else:
       self.site_obj.setImage(self.remote_obj.image)
-      self.site_obj.reindexObject()
+      self.reindex()
 
 
 class ImportLink(ImportObject):
@@ -132,7 +138,7 @@ class ImportLink(ImportObject):
       print "%s already exists, exiting create()" % self.remote_obj.shortname
     else:
       self.site_obj.setRemoteUrl(self.remote_obj.link_target)
-      self.site_obj.reindexObject()
+      self.reindex()
 
 class ImportPage(ImportObject):
 
@@ -147,4 +153,4 @@ class ImportPage(ImportObject):
       print "%s already exists, exiting create()" % self.remote_obj.shortname
     else:
       self.site_obj.setText(self.remote_obj.get_cooked_body())
-      self.site_obj.reindexObject()
+      self.reindex()

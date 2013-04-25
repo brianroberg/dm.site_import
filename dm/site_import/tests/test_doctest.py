@@ -1,4 +1,5 @@
 import unittest
+import datetime
 import doctest
 
 #from zope.testing import doctestunit
@@ -15,6 +16,7 @@ from dm.site_import.browser.RemoteObject import (HTTPError, NotFoundError,
                                                  RemoteLinkTarget,
                                                  OffsiteError,
                                                  RemoteObject, RemoteResource,
+                                                 extract_datetime,
                                                  extract_index_url,
                                                  extract_sort_criterion,
                                                  strip_plone_suffix)
@@ -102,6 +104,15 @@ class RemoteObjectTesting(unittest.TestCase):
     def testAbsoluteUrlDoubleDouble(self):
       remote_obj = RemoteObject('http://www.dm.org/about-us/our-staff/about-us/our-staff')
       self.assertEqual(remote_obj.absolute_url, 'http://www.dm.org/about-us/our-staff')
+
+    def test_extract_datetime_page_returns_none(self):
+      self.assertEqual(extract_datetime('<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">'), None)
+
+    def test_extract_datetime_normal(self):
+      date_str = '2013/04/24 15:00:00'
+      date_obj = datetime.datetime(2013, 04, 24, 15, 00, 00)
+      self.assertEqual(extract_datetime(date_str), date_obj)
+
 
     def test_extract_index_url_http(self):
       self.assertEqual(extract_index_url('http://www.dm.org'),

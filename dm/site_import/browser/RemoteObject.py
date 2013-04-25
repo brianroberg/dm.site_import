@@ -258,7 +258,7 @@ class RemoteObject(RemoteResource):
     elif self.obj_type == 'Image':
       self.image = self.make_http_request('image')
     elif self.obj_type == 'File':
-      #self.file_data = self.make_http_request('getFile')
+      self.file_data = self.make_http_request('getFile')
       pass
     elif self.obj_type == 'Link':
       self.link_target = self.make_http_request('getRemoteUrl')
