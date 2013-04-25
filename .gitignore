@@ -2,3 +2,4 @@
 *.pyc
 *.swp
 dm.site_import.egg-info
+dm/site_import/.apdisk
