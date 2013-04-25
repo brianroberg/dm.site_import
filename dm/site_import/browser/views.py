@@ -14,7 +14,7 @@ class DMSiteImportView(BrowserView):
     #starting_url = 'http://www.dm.org/about-us/our-staff/drippsb'
     #starting_url = 'http://gettysburg.dm.org/audio-archive/fall-2012-jesus-is-better-matthews-gospel/jesus-is-better-matthews-gospel'
     #starting_url = 'http://gettysburg.dm.org'
-    starting_url = 'https://staff.dm.org'
+    starting_url = 'http://www.dm.org'
 
     crawler = Crawler(starting_url)
     import_objects = crawler.get_import_objects()
@@ -31,7 +31,8 @@ class DMSiteImportView(BrowserView):
           continue
         import_obj = ImportPage(remote_obj, self)
         import_obj.create()
-      elif remote_obj.obj_type == 'Folder':
+      # Plone 4 has only one folder type.
+      elif remote_obj.obj_type in ['Folder', 'Large Folder']:
         import_obj = ImportFolder(remote_obj, self)
         import_obj.create()
       elif remote_obj.obj_type == 'Image':
