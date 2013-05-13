@@ -1,6 +1,7 @@
 from bs4 import BeautifulSoup
 from datetime import datetime
 import config
+import cPickle
 import httplib
 import re
 import requests
@@ -34,6 +35,14 @@ def extract_sort_criterion(criterion_id):
   else:
     msg = 'Unable to find sort criterion in string "%s"' % crit_id
     raise ValueError, msg
+
+
+def is_whole_page(s):
+  if s[:21] == '<!DOCTYPE html PUBLIC':
+    return True
+  else:
+    return False
+
 
 def strip_plone_suffix(url):
   """Return URL with any Plone-specific suffixes removed."""
@@ -72,11 +81,21 @@ class RemoteResource:
   # A simple cache to store results of HTTP requests.
   # Pre-load with a few URLs that don't return the correct
   # thing on their own.
-  http_requests = {'www.dm.org/give/paypal/choose-fund-preference/Type': 'Page',
-                   'www.dm.org/join/staff/apply/app/index_html/Type': 'Page',
-                   'www.dm.org/index_html/Type': 'Page',
-                   'www.dm.org/random_img/Type': 'Image'}
-
+  try:
+    pkl_file = open('http_requests.pkl', 'rb')
+    #http_requests = cPickle.load(pkl_file)
+    pkl_file.close()
+  except IOError:
+    http_requests = {'staff.dm.org/help_desk/staff_addresses/index_html/Type': 'Page',
+                     'staff.dm.org/help_desk/staff_birthdays/index_html/Type': 'Page',
+                     'staff.dm.org/teams/mentors/for-mentors-only/support_stats/Type': 'Page',
+                     'staff.dm.org/teams/mentors/for-mentors-only/Type': 'Folder',
+                     'staff.dm.org/teams/candidate_staff/candidate-staff-list/Type': 'Page',
+                     'www.dm.org/give/paypal/choose-fund-preference/Type': 'Page',
+                     'www.dm.org/join/staff/apply/app/index_html/Type': 'Page',
+                     'www.dm.org/index_html/Type': 'Page',
+                     'www.dm.org/random_img/Type': 'Image'}
+    
   form_folders = []
 
   def __str__(self):
@@ -130,8 +149,9 @@ class RemoteResource:
       # If the site has redirected us to the login page, log in
       # using credentials stored in the config module. Also force
       # login for the sitemap on the staff site.
-      if ('require_login' in r.url or
-          request_url == 'https://staff.dm.org/sitemap/CookedBody'):
+      if (('require_login' in r.url or
+          request_url == 'https://staff.dm.org/sitemap/CookedBody') or
+          is_whole_page(r.content)):
         self.log_in("https://%s/login_form" % self.get_site())
         r = self.session.request(method, request_url, verify=False)
       if r.status_code == 404:
@@ -142,15 +162,16 @@ class RemoteResource:
         raise BadRequestError, msg
       elif r.status_code >= 300:
         msg = "Server returned error status %s" % r.status_code
+        self.pickle_write(self)
         import pdb; pdb.set_trace()
         raise HTTPError, msg
 
       RemoteResource.http_requests[extract_index_url(request_url)] = r.content
+      if len(RemoteResource.http_requests) % 100 == 0:
+        RemoteResource.pickle_write(self)
       return r.content
     else:
       return RemoteResource.http_requests[extract_index_url(request_url)]
-
-
 
 
   def is_valid_url(self, url):
@@ -160,6 +181,13 @@ class RemoteResource:
     if parse_result.scheme[:4] != 'http':
       return False
     return True
+
+
+  def pickle_write(self):
+    output = open('http_requests.pkl', 'wb')
+    print "Opened file %s for writing." % output.name
+    cPickle.dump(RemoteResource.http_requests, output, -1)
+    output.close()
 
 
 class RemoteLinkTarget(RemoteResource):
@@ -238,7 +266,16 @@ class RemoteObject(RemoteResource):
     if self.shortname == 'sitemap':
       self.obj_type = 'Page'
     else:
-      self.obj_type = self.make_http_request('Type')
+      # Shortcuts for known filename extensions
+      if self.shortname[-4:].lower() in ['.jpg', '.png', '.gif']:
+        self.obj_type = 'Image'
+      elif self.shortname[-4:].lower() in (['.pdf', '.odt', '.ods',
+                                            '.mp3', '.doc']):
+        self.obj_type = 'File'
+
+      # If no shortcuts matched, look up the type explicitly.
+      else:
+        self.obj_type = self.make_http_request('Type')
 
     # Sometimes calling /Type on images returns "Plone Site," so
     # if that's what came back, double-check.
@@ -257,6 +294,7 @@ class RemoteObject(RemoteResource):
       self.default_page = self.make_http_request('getDefaultPage')
     elif self.obj_type == 'Image':
       self.image = self.make_http_request('image')
+      pass
     elif self.obj_type == 'File':
       self.file_data = self.make_http_request('getFile')
       pass
