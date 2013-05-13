@@ -27,8 +27,6 @@ class ImportObject(object):
       self.site_obj = container[self.remote_obj.shortname]
       self.site_obj.setTitle(self.remote_obj.title)
 
-      # TODO: Figure out why setting modification date isn't working.
-      # Metadata
       if hasattr(self.remote_obj, 'creator'):
         self.site_obj.setCreators(self.remote_obj.creator,)
       if hasattr(self.remote_obj, 'creation_date'):

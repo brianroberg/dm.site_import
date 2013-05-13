@@ -13,8 +13,7 @@ class DMSiteImportView(BrowserView):
 
     #starting_url = 'http://www.dm.org/about-us/our-staff/drippsb'
     #starting_url = 'http://gettysburg.dm.org/audio-archive/fall-2012-jesus-is-better-matthews-gospel/jesus-is-better-matthews-gospel'
-    #starting_url = 'http://gettysburg.dm.org'
-    starting_url = 'http://www.dm.org'
+    starting_url = 'https://staff.dm.org'
 
     crawler = Crawler(starting_url)
     import_objects = crawler.get_import_objects()
