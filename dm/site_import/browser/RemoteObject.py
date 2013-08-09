@@ -5,10 +5,18 @@ import cPickle
 import httplib
 import re
 import requests
+import shelve
+import string
 import urllib
 import urlparse
 
 def extract_datetime(date_str):
+  # First make sure the string we've received consists entirely
+  # of printable characters.
+  if not set(date_str).issubset(set(string.printable)):
+    msg = 'Value passed to extract_datetime contained unprintable characters.'
+    raise ValueError, msg
+
   if date_str[:21] == '<!DOCTYPE html PUBLIC':
     return None
   pattern = '(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})'
@@ -81,20 +89,20 @@ class RemoteResource:
   # A simple cache to store results of HTTP requests.
   # Pre-load with a few URLs that don't return the correct
   # thing on their own.
-  try:
-    pkl_file = open('http_requests.pkl', 'rb')
-    #http_requests = cPickle.load(pkl_file)
-    pkl_file.close()
-  except IOError:
-    http_requests = {'staff.dm.org/help_desk/staff_addresses/index_html/Type': 'Page',
-                     'staff.dm.org/help_desk/staff_birthdays/index_html/Type': 'Page',
-                     'staff.dm.org/teams/mentors/for-mentors-only/support_stats/Type': 'Page',
-                     'staff.dm.org/teams/mentors/for-mentors-only/Type': 'Folder',
-                     'staff.dm.org/teams/candidate_staff/candidate-staff-list/Type': 'Page',
-                     'www.dm.org/give/paypal/choose-fund-preference/Type': 'Page',
-                     'www.dm.org/join/staff/apply/app/index_html/Type': 'Page',
-                     'www.dm.org/index_html/Type': 'Page',
-                     'www.dm.org/random_img/Type': 'Image'}
+  http_requests = shelve.open('http_requests', protocol=2)
+  d = {'staff.dm.org/help_desk/staff_addresses/index_html/Type': 'Page',
+       'staff.dm.org/help_desk/staff_birthdays/index_html/Type': 'Page',
+       'staff.dm.org/teams/mentors/for-mentors-only/support_stats/Type': 'Page',
+       'staff.dm.org/teams/mentors/for-mentors-only/Type': 'Folder',
+       'staff.dm.org/teams/presidents/manuals/operations/human-resources/payroll/quarterly_taxes/pa_sales_tax/Type': 'Page',
+       'staff.dm.org/teams/candidate_staff/candidate-staff-list/Type': 'Page',
+       'www.dm.org/give/paypal/choose-fund-preference/Type': 'Page',
+       'www.dm.org/join/staff/apply/app/index_html/Type': 'Page',
+       'www.dm.org/index_html/Type': 'Page',
+       'www.dm.org/random_img/Type': 'Image'}
+  for url in d.keys():
+    if not http_requests.has_key(url):
+      http_requests[url] = d[url]
     
   form_folders = []
 
@@ -139,7 +147,7 @@ class RemoteResource:
 
     # Check whether we've already made this request. If so, use the
     # result we got last time instead of making it again.
-    if extract_index_url(request_url) not in RemoteResource.http_requests:
+    if not RemoteResource.http_requests.has_key(extract_index_url(request_url)):
       try:
         r = self.session.request(method, request_url, verify=False)
       except requests.TooManyRedirects:
@@ -162,13 +170,10 @@ class RemoteResource:
         raise BadRequestError, msg
       elif r.status_code >= 300:
         msg = "Server returned error status %s" % r.status_code
-        self.pickle_write(self)
         import pdb; pdb.set_trace()
         raise HTTPError, msg
 
       RemoteResource.http_requests[extract_index_url(request_url)] = r.content
-      if len(RemoteResource.http_requests) % 100 == 0:
-        RemoteResource.pickle_write(self)
       return r.content
     else:
       return RemoteResource.http_requests[extract_index_url(request_url)]
@@ -181,13 +186,6 @@ class RemoteResource:
     if parse_result.scheme[:4] != 'http':
       return False
     return True
-
-
-  def pickle_write(self):
-    output = open('http_requests.pkl', 'wb')
-    print "Opened file %s for writing." % output.name
-    cPickle.dump(RemoteResource.http_requests, output, -1)
-    output.close()
 
 
 class RemoteLinkTarget(RemoteResource):
@@ -286,8 +284,13 @@ class RemoteObject(RemoteResource):
           self.obj_type = 'Image'
       except NotFoundError:
         self.soup = BeautifulSoup(self.make_http_request('view'))
-    if self.obj_type in ['News Item', 'Page']:
+    if self.obj_type == 'Page':
       self.soup = BeautifulSoup(self.get_cooked_body())
+    elif self.obj_type == 'News Item':
+      #self.text = self.make_http_request('getText')
+      #self.soup = BeautifulSoup(self.text)
+      self.soup = BeautifulSoup(self.get_cooked_body())
+      self.caption = self.make_http_request('getImageCaption')
     elif self.obj_type in ['Folder', 'Large Folder']:
       self.soup = BeautifulSoup(self.make_http_request('view'))
       self.soup = self.soup.select('#region-content')[0]
@@ -342,6 +345,9 @@ class RemoteObject(RemoteResource):
 
           
       sort_criterion_id = self.make_http_request('getSortCriterion')
+      if is_whole_page(sort_criterion_id):
+        self.log_in("https://%s/login_form" % self.get_site())
+        sort_criterion_id = self.make_http_request('getSortCriterion')
       if sort_criterion_id:
         self.sort_criterion_str = extract_sort_criterion(sort_criterion_id)
 
@@ -350,7 +356,7 @@ class RemoteObject(RemoteResource):
     elif self.obj_type == 'Form Folder':
       print "Found a form folder at %s" % self.absolute_url
       RemoteResource.form_folders.append(self.absolute_url)
-      print "Total form folers: %s" % len(RemoteResource.form_folders)
+      print "Total form folders: %s" % len(RemoteResource.form_folders)
     elif self.obj_type == 'Plone Site':
       # We already matched this above, so nothing more to do.
       pass

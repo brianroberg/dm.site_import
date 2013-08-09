@@ -1,9 +1,11 @@
 from ImportObject import (ImportObject, ImportFile, ImportFolder, 
                           ImportImage, ImportPage)
 from RemoteObject import (BadRequestError, HTTPError, NotFoundError,
-                          RemoteLinkTarget, RemoteObject,
+                          RemoteResource, RemoteLinkTarget, RemoteObject,
                           extract_index_url)
 import requests
+import shelve
+import sys
 import urlparse
 
 class Crawler(object):
@@ -13,7 +15,10 @@ class Crawler(object):
     # Each value is an Import Object.
     # Each key is the object's absolute_url (as returned in the
     # original site).
-    self.objects_seen = {}
+    sys.setrecursionlimit(30000)
+    site = urlparse.urlparse(starting_url).netloc
+    self.objects_seen = shelve.open("objects_seen-%s" % site, protocol=2)
+
 
     # HTTP session, created here so that it can persist across all
     # the RemoteLinkTargets and RemoteObjects we'll be creating.
@@ -27,7 +32,8 @@ class Crawler(object):
     # TODO: There are some URLs we shouldn't try to retrieve because
     # they don't exist in Zope, e.g. dm.org/donate. I could hard-code
     # those URLs here.
-    self.skip_list = ['http://www.dm.org/donate']
+    self.skip_list = ['http://www.dm.org/donate',
+                      'https://staff.dm.org/reports/my-reports']
 
   def get_import_objects(self):
 
@@ -41,7 +47,12 @@ class Crawler(object):
     # There are some string patterns in URLs which tell us
     # right away that we don't want to follow the link.
     skip_strings = ['@@', '++resource++', 'createObject?',
-                    'support_stats_entry_form']
+                    'pref_groups_overview',
+                    'select_default_page',
+                    'selectViewTemplate',
+                    'staff.dm.org/roundup/info',
+                    'support_stats_entry_form',
+                    'alumnus-testimony-mike']
     for s in skip_strings:
       if s in url:
         return True
@@ -79,9 +90,9 @@ class Crawler(object):
 
       if self.needs_crawled(rlt.absolute_url):
         # limit extent of crawling during development
-        #if len(self.objects_seen.keys()) > 50:
-        #  print "50 objects seen, breaking loop"
-        #  break
+        if len(self.objects_seen.keys()) > 50:
+          print "50 objects seen, breaking loop"
+          break
 
         # Create a RemoteObject to represent the piece of content we're
         # looking at.
@@ -104,7 +115,7 @@ class Crawler(object):
       self.queue(RemoteObject(parent_url, session = self.session))
 
     self.objects_seen[remote_obj.get_index_url()] = remote_obj
-    print "*** %s *** %s" % (len(self.objects_seen.keys()),
+    print "*** %s *** %s" % (len(self.objects_seen),
                              remote_obj.absolute_url)
 
     # Pages and Folders should be crawled further.
@@ -113,13 +124,14 @@ class Crawler(object):
 
 
   def needs_crawled(self, url):
-    if extract_index_url(url) in self.objects_seen:
+    if self.objects_seen.has_key(extract_index_url(url)):
       return False
     if url in self.skip_list:
       return False
     
     # If the URL ends with any of these strings, don't crawl it.
-    skip_suffixes = ['atct_edit',
+    skip_suffixes = ['aggregator',
+                     'atct_edit',
                      'application.png',
                      'audio.png',
                      'author',
@@ -154,8 +166,11 @@ class Crawler(object):
                      'plone_control_panel',
                      'plone_memberprefs_panel',
                      '#portlet-navigation-tree',
+                     'prefs_groups_overview',
+                     'random_img',
                      'RSS',
                      'search_form',
+                     'select_default_page',
                      'select_default_view',
                      'sendto_form',
                      'spinner.gif',

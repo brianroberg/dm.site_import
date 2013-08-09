@@ -1,3 +1,4 @@
+from zExceptions import BadRequest
 import urllib
 
 class ObjectAlreadyExistsError(ValueError):
@@ -22,8 +23,12 @@ class ImportObject(object):
     if self.remote_obj.shortname in container.objectIds():
       raise ObjectAlreadyExistsError
     else:
-      container.invokeFactory(self.type_name,
-			      self.remote_obj.shortname)
+      try:
+        container.invokeFactory(self.type_name, self.remote_obj.shortname)
+      except BadRequest:
+        self.remote_obj.shortname = "%s-RENAMED" % self.remote_obj.shortname
+        container.invokeFactory(self.type_name, self.remote_obj.shortname)
+
       self.site_obj = container[self.remote_obj.shortname]
       self.site_obj.setTitle(self.remote_obj.title)
 
@@ -136,6 +141,23 @@ class ImportLink(ImportObject):
       print "%s already exists, exiting create()" % self.remote_obj.shortname
     else:
       self.site_obj.setRemoteUrl(self.remote_obj.link_target)
+      self.reindex()
+
+class ImportNewsItem(ImportObject):
+
+  def __init__(self, remote_obj, view_obj):
+    self.type_name = 'News Item'
+    ImportObject.__init__(self, remote_obj, view_obj)
+
+  def create(self):
+    try:
+      ImportObject.create(self)
+    except ObjectAlreadyExistsError:
+      print "%s already exists, exiting create()" % self.remote_obj.shortname
+    else:
+      #self.site_obj.setText(self.remote_obj.soup)
+      self.site_obj.setText(self.remote_obj.get_cooked_body())
+      self.site_obj.setImageCaption(self.remote_obj.caption)
       self.reindex()
 
 class ImportPage(ImportObject):

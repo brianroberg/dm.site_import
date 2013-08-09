@@ -1,19 +1,24 @@
 from Products.Five.browser import BrowserView
 from Crawler import Crawler
 from ImportObject import (ImportObject, ImportFile, ImportFolder, 
-                          ImportImage, ImportPage, ImportCollection)
+                          ImportImage, ImportPage, ImportCollection,
+                          ImportNewsItem)
 from RemoteObject import (HTTPError, NotFoundError, RemoteLinkTarget,
                           RemoteObject)
 import config
+import decimal
+import shelve
 
 class DMSiteImportView(BrowserView):
 
   def __call__(self):
     self.remove_events_and_news()
 
-    #starting_url = 'http://www.dm.org/about-us/our-staff/drippsb'
+    #starting_url = 'http://www.dm.org/news'
+    #starting_url = 'http://esu.dm.org/sitemap'
     #starting_url = 'http://gettysburg.dm.org/audio-archive/fall-2012-jesus-is-better-matthews-gospel/jesus-is-better-matthews-gospel'
-    starting_url = 'https://staff.dm.org'
+    #starting_url = 'http://www.dm.org/site-homepage'
+    starting_url = 'https://staff.dm.org/index_html'
 
     crawler = Crawler(starting_url)
     import_objects = crawler.get_import_objects()
@@ -21,7 +26,13 @@ class DMSiteImportView(BrowserView):
     urls = import_objects.keys()
     urls.sort()
 
+    i = 0
+    lu = len(urls)
+    decimal.getcontext().prec = 4
     for url in urls:
+      percentage = decimal.Decimal(i) / decimal.Decimal(lu) * 100
+      print "%s of %s (%s%%)" % (str(i), str(lu), str(percentage))
+      i = i + 1
       remote_obj = import_objects[url]
       if remote_obj.obj_type == 'Page':
         # The sitemap is a special case: it's helpful to crawl
@@ -46,13 +57,18 @@ class DMSiteImportView(BrowserView):
       elif remote_obj.obj_type == 'Collection':
         import_obj = ImportCollection(remote_obj, self)
         import_obj.create()
+      elif remote_obj.obj_type == 'News Item':
+        import_obj = ImportNewsItem(remote_obj, self)
+        import_obj.create()
       elif remote_obj.obj_type == 'Plone Site':
         pass
+      elif remote_obj.obj_type == 'Form Folder':
+        print 'FORM FOLDER at %s' % remote_obj.absolute_url
       else:
         msg = 'Unknown type "%s" for remote object at %s' % (remote_obj.obj_type, remote_obj.absolute_url)
         raise ValueError, msg
 
-
+    import_objects.close()
 
   def remove_events_and_news(self):
     """Remove these folders in preparation for importing."""
