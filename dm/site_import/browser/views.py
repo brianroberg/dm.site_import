@@ -1,8 +1,8 @@
 from Products.Five.browser import BrowserView
 from Crawler import Crawler
 from ImportObject import (ImportObject, ImportFile, ImportFolder, 
-                          ImportImage, ImportPage, ImportCollection,
-                          ImportNewsItem)
+                          ImportImage, ImportLink, ImportPage,
+                          ImportCollection, ImportNewsItem)
 from RemoteObject import (HTTPError, NotFoundError, RemoteLinkTarget,
                           RemoteObject)
 import config
@@ -15,7 +15,7 @@ class DMSiteImportView(BrowserView):
     self.remove_events_and_news()
 
     #starting_url = 'http://www.dm.org/news'
-    #starting_url = 'http://esu.dm.org/sitemap'
+    #starting_url = 'http://bloomsburg.dm.org/'
     #starting_url = 'http://gettysburg.dm.org/audio-archive/fall-2012-jesus-is-better-matthews-gospel/jesus-is-better-matthews-gospel'
     #starting_url = 'http://www.dm.org/site-homepage'
     starting_url = 'https://staff.dm.org/index_html'
@@ -26,7 +26,7 @@ class DMSiteImportView(BrowserView):
     urls = import_objects.keys()
     urls.sort()
 
-    i = 0
+    i = 1
     lu = len(urls)
     decimal.getcontext().prec = 4
     for url in urls:
@@ -68,7 +68,9 @@ class DMSiteImportView(BrowserView):
         msg = 'Unknown type "%s" for remote object at %s' % (remote_obj.obj_type, remote_obj.absolute_url)
         raise ValueError, msg
 
+    print "Done creating objects.  Closing import_objects shelf..."
     import_objects.close()
+    print "Done."
 
   def remove_events_and_news(self):
     """Remove these folders in preparation for importing."""

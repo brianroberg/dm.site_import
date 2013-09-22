@@ -90,9 +90,9 @@ class Crawler(object):
 
       if self.needs_crawled(rlt.absolute_url):
         # limit extent of crawling during development
-        if len(self.objects_seen.keys()) > 50:
-          print "50 objects seen, breaking loop"
-          break
+        #if len(self.objects_seen.keys()) > 50:
+        #  print "50 objects seen, breaking loop"
+        #  break
 
         # Create a RemoteObject to represent the piece of content we're
         # looking at.
@@ -136,6 +136,7 @@ class Crawler(object):
                      'audio.png',
                      'author',
                      'author/siteimport',
+                     'business_card_request/index_html',
                      'contact-info',
                      'content_status_history',
                      'dashboard',
@@ -161,21 +162,26 @@ class Crawler(object):
                      'object_copy',
                      'ods.png',
                      'odt.png',
+                     'password_form',
                      'pdf.png',
                      'pdf_icon.gif',
+                     'personalize_form',
                      'plone_control_panel',
                      'plone_memberprefs_panel',
                      '#portlet-navigation-tree',
                      'prefs_groups_overview',
                      'random_img',
+                     'recently_modified',
                      'RSS',
                      'search_form',
                      'select_default_page',
                      'select_default_view',
                      'sendto_form',
                      'spinner.gif',
+                     'staff_addresses/index_html',
                      'topic_icon.gif',
                      'user.gif',
+                     'versions_history_form',
                      'video.png',
                      'xls.png',
                      'zip.png']

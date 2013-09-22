@@ -95,6 +95,7 @@ class RemoteResource:
        'staff.dm.org/teams/mentors/for-mentors-only/support_stats/Type': 'Page',
        'staff.dm.org/teams/mentors/for-mentors-only/Type': 'Folder',
        'staff.dm.org/teams/presidents/manuals/operations/human-resources/payroll/quarterly_taxes/pa_sales_tax/Type': 'Page',
+       'staff.dm.org/teams/presidents/systems/wiki/systems-wiki/getSortCriterion': '<ATSortCriterion at crit__modified_ATSortCriterion>',
        'staff.dm.org/teams/candidate_staff/candidate-staff-list/Type': 'Page',
        'www.dm.org/give/paypal/choose-fund-preference/Type': 'Page',
        'www.dm.org/join/staff/apply/app/index_html/Type': 'Page',
@@ -148,11 +149,7 @@ class RemoteResource:
     # Check whether we've already made this request. If so, use the
     # result we got last time instead of making it again.
     if not RemoteResource.http_requests.has_key(extract_index_url(request_url)):
-      try:
-        r = self.session.request(method, request_url, verify=False)
-      except requests.TooManyRedirects:
-        print "TooManyRedirects raised while trying to access %s" % request_url
-        import pdb; pdb.set_trace()
+      r = self.session.request(method, request_url, verify=False)
 
       # If the site has redirected us to the login page, log in
       # using credentials stored in the config module. Also force
@@ -170,7 +167,6 @@ class RemoteResource:
         raise BadRequestError, msg
       elif r.status_code >= 300:
         msg = "Server returned error status %s" % r.status_code
-        import pdb; pdb.set_trace()
         raise HTTPError, msg
 
       RemoteResource.http_requests[extract_index_url(request_url)] = r.content
@@ -247,10 +243,27 @@ class RemoteObject(RemoteResource):
 
     relative_url_str = self.make_http_request('virtual_url_path')
     self.relative_url = relative_url_str.split('/')
+    self.shortname = urllib.unquote(self.relative_url[-1])
+
+    # Handle the sitemap specially because trying to retrieve
+    # metadata on it doesn't seem to produce anything useful.
+    # We don't need all its metadata because we're only crawling
+    # it, not importing it.
+    if self.shortname == 'sitemap':
+      self.obj_type = 'Page'
+      self.soup = BeautifulSoup(self.get_cooked_body())
+      # Explicitly exit __init__
+      return None
 
     # Retrieve the title and id (which we'll call "shortname")
-    self.title = self.make_http_request('Title')
-    self.shortname = urllib.unquote(self.relative_url[-1])
+    try:
+      self.title = self.make_http_request('Title')
+    except HTTPError:
+      try:
+        self.title = self.make_http_request('title_or_id')
+      except HTTPError:
+        # Allow the title to be blank.
+        self.title = ''
 
     # Retrieve other metadata
     self.creator = self.make_http_request('Creator')
@@ -259,21 +272,17 @@ class RemoteObject(RemoteResource):
     mdate_str = self.make_http_request('modified')
     self.modification_date = extract_datetime(mdate_str)
     
-    # Handle the sitemap specially because calling '/Type' on it
-    # returns the sitemap itself rather than a useful type.
-    if self.shortname == 'sitemap':
-      self.obj_type = 'Page'
-    else:
-      # Shortcuts for known filename extensions
-      if self.shortname[-4:].lower() in ['.jpg', '.png', '.gif']:
-        self.obj_type = 'Image'
-      elif self.shortname[-4:].lower() in (['.pdf', '.odt', '.ods',
-                                            '.mp3', '.doc']):
-        self.obj_type = 'File'
 
-      # If no shortcuts matched, look up the type explicitly.
-      else:
-        self.obj_type = self.make_http_request('Type')
+    # Shortcuts for known filename extensions
+    if self.shortname[-4:].lower() in ['.jpg', '.png', '.gif']:
+      self.obj_type = 'Image'
+    elif self.shortname[-4:].lower() in (['.pdf', '.odt', '.ods',
+                                          '.mp3', '.doc']):
+      self.obj_type = 'File'
+
+    # If no shortcuts matched, look up the type explicitly.
+    else:
+      self.obj_type = self.make_http_request('Type')
 
     # Sometimes calling /Type on images returns "Plone Site," so
     # if that's what came back, double-check.
@@ -296,8 +305,13 @@ class RemoteObject(RemoteResource):
       self.soup = self.soup.select('#region-content')[0]
       self.default_page = self.make_http_request('getDefaultPage')
     elif self.obj_type == 'Image':
-      self.image = self.make_http_request('image')
-      pass
+      try:
+        self.image = self.make_http_request('image')
+      # We'll get TooManyRedirects if an image is saved as a File object,
+      # which has happened at times but we'd like to correct.
+      except requests.TooManyRedirects:
+        print "TooManyRedirects raised while trying to access %s/%s" % (self.absolute_url, 'image')
+        self.image = self.make_http_request('getFile')
     elif self.obj_type == 'File':
       self.file_data = self.make_http_request('getFile')
       pass
@@ -320,7 +334,7 @@ class RemoteObject(RemoteResource):
         # Type
         if crit_id == 'crit__Type_ATPortalTypeCriterion':
           try:
-            url = "%s/getRawValue" % crit_id
+            url = "%s/Value" % crit_id
             result = self.make_http_request(url)
             self.type_criterion = eval(result)
           except SyntaxError:
@@ -344,11 +358,16 @@ class RemoteObject(RemoteResource):
           import pdb; pdb.set_trace()
 
           
-      sort_criterion_id = self.make_http_request('getSortCriterion')
-      if is_whole_page(sort_criterion_id):
+      criteria = self.make_http_request('listCriteria')
+      if is_whole_page(criteria):
         self.log_in("https://%s/login_form" % self.get_site())
-        sort_criterion_id = self.make_http_request('getSortCriterion')
-      if sort_criterion_id:
+        criteria = self.make_http_request('listCriteria')
+      if criteria:
+        pattern = '<ATSortCriterion at .*>'
+        match_obj = re.search(pattern, criteria)
+        if match_obj:
+          sort_criterion_id = match_obj.group()
+
         self.sort_criterion_str = extract_sort_criterion(sort_criterion_id)
 
 
