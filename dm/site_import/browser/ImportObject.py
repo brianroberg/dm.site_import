@@ -38,13 +38,15 @@ class ImportObject(object):
         self.site_obj.setCreationDate(self.remote_obj.creation_date)
       if hasattr(self.remote_obj, 'modification_date'):
         self.site_obj.setModificationDate(self.remote_obj.modification_date)
+      if hasattr(self.remote_obj, 'exclude_from_nav'):
+        self.site_obj.setExcludeFromNav(self.remote_obj.exclude_from_nav)
       
   def reindex(self):
     """Call reindexObject on the site_obj without resetting mod date."""
-    od = self.site_obj.__dict__
-    od['notifyModified'] = lambda *args: None
-    self.site_obj.reindexObject()
-    del od['notifyModified']
+    #od = self.site_obj.__dict__
+    #od['notifyModified'] = lambda *args: None
+    self.site_obj.indexObject()
+    #del od['notifyModified']
 
 
 class ImportCollection(ImportObject):

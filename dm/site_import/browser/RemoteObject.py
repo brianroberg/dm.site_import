@@ -11,14 +11,16 @@ import urllib
 import urlparse
 
 def extract_datetime(date_str):
-  # First make sure the string we've received consists entirely
+  # If we've received an entire web page as a result, return no date.
+  if date_str[:21] == '<!DOCTYPE html PUBLIC':
+    return None
+
+  # Make sure the string we've received consists entirely
   # of printable characters.
   if not set(date_str).issubset(set(string.printable)):
     msg = 'Value passed to extract_datetime contained unprintable characters.'
     raise ValueError, msg
 
-  if date_str[:21] == '<!DOCTYPE html PUBLIC':
-    return None
   pattern = '(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})'
   match = re.match(pattern, date_str)
   if match:
@@ -271,6 +273,10 @@ class RemoteObject(RemoteResource):
     self.creation_date = extract_datetime(cdate_str)
     mdate_str = self.make_http_request('modified')
     self.modification_date = extract_datetime(mdate_str)
+    try:
+      self.exclude_from_nav = self.make_http_request('getExcludeFromNav')
+    except NotFoundError:
+      pass
     
 
     # Shortcuts for known filename extensions
@@ -367,8 +373,7 @@ class RemoteObject(RemoteResource):
         match_obj = re.search(pattern, criteria)
         if match_obj:
           sort_criterion_id = match_obj.group()
-
-        self.sort_criterion_str = extract_sort_criterion(sort_criterion_id)
+          self.sort_criterion_str = extract_sort_criterion(sort_criterion_id)
 
 
 
