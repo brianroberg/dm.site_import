@@ -7,6 +7,7 @@ import re
 import requests
 import shelve
 import string
+import time
 import urllib
 import urlparse
 
@@ -91,7 +92,7 @@ class RemoteResource:
   # A simple cache to store results of HTTP requests.
   # Pre-load with a few URLs that don't return the correct
   # thing on their own.
-  http_requests = shelve.open('http_requests', protocol=2)
+  http_requests = shelve.open('/media/scratch/http_requests', protocol=2)
   d = {'staff.dm.org/help_desk/staff_addresses/index_html/Type': 'Page',
        'staff.dm.org/help_desk/staff_birthdays/index_html/Type': 'Page',
        'staff.dm.org/teams/mentors/for-mentors-only/support_stats/Type': 'Page',
@@ -141,7 +142,7 @@ class RemoteResource:
     return None
 
 
-  def make_http_request(self, suffix="", method="GET"):
+  def make_http_request(self, suffix="", method="GET", second_try=False):
     # Validate the method.  GET and POST currently supported.
     if method.upper() not in ['GET', 'POST']:
       raise ValueError, 'Unsupported method "%s"' % method
@@ -167,6 +168,11 @@ class RemoteResource:
       elif r.status_code == 400:
         msg = "Server returned error status %s" % r.status_code
         raise BadRequestError, msg
+      elif r.status_code == 503 and second_try:
+        print "Server returned error status %s, waiting 5 sec before retrying" % r.status_code
+        time.sleep(5)
+        return self.make_http_request(suffix, method, second_try=True)
+
       elif r.status_code >= 300:
         msg = "Server returned error status %s" % r.status_code
         raise HTTPError, msg
@@ -268,16 +274,47 @@ class RemoteObject(RemoteResource):
         self.title = ''
 
     # Retrieve other metadata
+    self.description = self.make_http_request('Description')
     self.creator = self.make_http_request('Creator')
     cdate_str = self.make_http_request('created')
-    self.creation_date = extract_datetime(cdate_str)
+    try:
+      self.creation_date = extract_datetime(cdate_str)
+    except ValueError:
+      # Retrieving the dates seems to fail intermittently.  Let's just
+      # try one more time.
+      cdate_str_take_2 = self.make_http_request('created')
+      try:
+        self.creation_date = extract_datetime(cdate_str)
+      except ValueError:
+        # OK, we'll give up.
+        print "ERROR retrieving or extracting creation date for %s" % self.absolute_url
+
     mdate_str = self.make_http_request('modified')
-    self.modification_date = extract_datetime(mdate_str)
+    try:
+      self.modification_date = extract_datetime(mdate_str)
+    except ValueError:
+      # Retrieving the dates seems to fail intermittently.  Let's just
+      # try one more time.
+      mdate_str_take_2 = self.make_http_request('modified')
+      try:
+        self.modification_date = extract_datetime(mdate_str)
+      except ValueError:
+        # OK, we'll give up.
+        print "ERROR retrieving or extracting modification date for %s" % self.absolute_url
     try:
       self.exclude_from_nav = self.make_http_request('getExcludeFromNav')
     except NotFoundError:
       pass
-    
+   
+    # AFAIK we can't retrieve workflow state directly via HTTP. Therefore,
+    # call out to a helper script we've placed in the site being migrated.
+    try:
+      self.review_state = self.make_http_request('call_get_state').strip()
+      print "%s in review state \"%s\"" % (self.absolute_url, self.review_state)
+    except HTTPError:
+      # Allow a blank publication state.
+      print "HTTPError while retrieving review state for %s." % self.absolute_url
+    #import pdb; pdb.set_trace()
 
     # Shortcuts for known filename extensions
     if self.shortname[-4:].lower() in ['.jpg', '.png', '.gif']:
@@ -300,7 +337,10 @@ class RemoteObject(RemoteResource):
       except NotFoundError:
         self.soup = BeautifulSoup(self.make_http_request('view'))
     if self.obj_type == 'Page':
-      self.soup = BeautifulSoup(self.get_cooked_body())
+      #import pdb; pdb.set_trace()
+      body_text = self.get_cooked_body().replace('src="pdf_icon.gif"',
+                                                 'src="pdf.png"')
+      self.soup = BeautifulSoup(body_text)
     elif self.obj_type == 'News Item':
       #self.text = self.make_http_request('getText')
       #self.soup = BeautifulSoup(self.text)
@@ -309,7 +349,8 @@ class RemoteObject(RemoteResource):
     elif self.obj_type in ['Folder', 'Large Folder']:
       self.soup = BeautifulSoup(self.make_http_request('view'))
       self.soup = self.soup.select('#region-content')[0]
-      self.default_page = self.make_http_request('getDefaultPage')
+      self.default_page = self.get_default_page()
+      self.contents_urls = self.make_http_request('get_contents_urls')
     elif self.obj_type == 'Image':
       try:
         self.image = self.make_http_request('image')
@@ -323,6 +364,8 @@ class RemoteObject(RemoteResource):
       pass
     elif self.obj_type == 'Link':
       self.link_target = self.make_http_request('getRemoteUrl')
+    #elif self.obj_type == 'Script':
+    #  self.content = self.make_http_request('read')
     # TODO: fix this. collections should be able to report their
     # contents.  But there's an old error in the site that prevents
     # folder_contents from working.
@@ -359,6 +402,16 @@ class RemoteObject(RemoteResource):
         elif crit_id == 'crit__created_ATFriendlyDateCriteria':
           self.relative_date_value = self.make_http_request("%s/Value" % crit_id)
 
+        # Effective Date
+        elif crit_id == 'crit__effective_ATFriendlyDateCriteria':
+          self.effective_relative_date_value = self.make_http_request("%s/Value" % crit_id)
+        # Searchable Text
+        elif crit_id == 'crit__SearchableText_ATSimpleStringCriterion':
+          self.searchable_text_criterion = self.make_http_request("%s/Value" % crit_id)
+
+        # Searchable Text
+        elif crit_id == 'crit__Description_ATSimpleStringCriterion':
+          self.description_criterion = self.make_http_request("%s/Value" % crit_id)
         else:
           print "**** Collection %s has a criterion I don't know how to handle: %s" % (self.absolute_url, crit_id)
           import pdb; pdb.set_trace()
@@ -394,6 +447,14 @@ class RemoteObject(RemoteResource):
 
   def get_cooked_body(self):
     return self.make_http_request('CookedBody')
+
+  def get_default_page(self):
+    default_page = self.make_http_request('getDefaultPage')
+    if default_page not in ['folder_listing']:
+      return default_page
+    else:
+      return None
+
 
   def get_folder_body(self):
     return self.make_http_request('folder_contents')
