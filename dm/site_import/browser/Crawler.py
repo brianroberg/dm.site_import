@@ -17,7 +17,7 @@ class Crawler(object):
     # original site).
     sys.setrecursionlimit(30000)
     site = urlparse.urlparse(starting_url).netloc
-    self.objects_seen = shelve.open("objects_seen-%s" % site, protocol=2)
+    self.objects_seen = shelve.open("/media/scratch/objects_seen-%s" % site, protocol=2)
 
 
     # HTTP session, created here so that it can persist across all
@@ -50,6 +50,17 @@ class Crawler(object):
                     'pref_groups_overview',
                     'select_default_page',
                     'selectViewTemplate',
+
+                    # temporary, to split transfer into parts
+                    'staff.dm.org/events',
+                    'staff.dm.org/help_desk',
+                    'staff.dm.org/reports',
+                    #'staff.dm.org/teams',
+                    #'staff.dm.org/teams/presidents',
+
+                    # because for some reason this page hangs the script
+                    'systems/wiki/pdf-mime-types',
+
                     'staff.dm.org/roundup/info',
                     'support_stats_entry_form',
                     'alumnus-testimony-mike']
@@ -66,11 +77,16 @@ class Crawler(object):
     #    1. Any objects above it in the containment hierarchy
     #    2. Any objects it links to
     #    3. The default view (e.g. of a folder), if set
+    #    4. For folders, all contentish items in the folder
 
     # If a default view is set, add it to the list of targets
     # to evaluate.
     if hasattr(remote_obj, 'default_page'):
       targets.append(remote_obj.default_page)
+
+    if hasattr(remote_obj, 'contents_urls'):
+      #import pdb; pdb.set_trace()
+      targets = targets + eval(remote_obj.contents_urls)
 
     for t in targets:
       if not t:
